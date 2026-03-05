@@ -347,14 +347,18 @@ header {
 /* ── MAP ── */
 #map-container {
   height: 520px;
-  border-radius: 3px;
-  overflow: hidden;
   margin-bottom: 18px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
+  border-radius: 3px;
   position: relative;
+  /* No overflow:hidden — it creates a stacking context that offsets Leaflet tiles */
 }
-#map { height: 100%; width: 100%; }
+#map {
+  height: 100%;
+  width: 100%;
+  border-radius: 3px;
+}
 .map-legend {
   position: absolute; bottom: 24px; right: 8px;
   z-index: 1000;
@@ -1064,7 +1068,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v62</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v66</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -2967,6 +2971,16 @@ async function loadData() {
     updateKpiGrid();
     initDragDrop();
 
+    // Init Leaflet while map tab is briefly visible so it measures
+    // the correct container position (getBoundingClientRect needs display:block)
+    const _tabMap  = document.getElementById('tab-map');
+    const _tabDash = document.getElementById('tab-dashboard');
+    _tabMap.style.display  = 'block';
+    _tabDash.style.display = 'none';
+    initMap();
+    _tabMap.style.display  = 'none';
+    _tabDash.style.display = 'block';
+
     const now = new Date();
     document.getElementById('sync-time').textContent =
       `Synced ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
@@ -3121,15 +3135,16 @@ function switchTab(tab) {
   document.getElementById('tab-btn-map').classList.toggle('active', tab === 'map');
 
   if (tab === 'map') {
-    if (!mapInstance) {
-      initMap();
-    }
-    // Single invalidateSize after browser has painted the now-visible container
+    // Map is always pre-initialised at load time with correct dimensions.
+    // Just invalidateSize in case the window was resized, then update.
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        mapInstance?.invalidateSize({ animate: false });
-        updateMap();
-      });
+      mapInstance?.invalidateSize({ animate: false });
+      updateMap();
+      const bounds = mapInstance?._grapeBounds;
+      if (bounds?.isValid()) {
+        mapInstance.fitBounds(bounds, { padding: [20, 20], animate: false });
+        delete mapInstance._grapeBounds;
+      }
     });
   }
 }
@@ -3263,15 +3278,11 @@ function blockPopupHTML(blockCode) {
 }
 
 function initMap() {
-  // Temporarily make container visible off-screen so Leaflet can measure it
-  const tabMap = document.getElementById('tab-map');
-  const wasHidden = tabMap.style.display === 'none' || getComputedStyle(tabMap).display === 'none';
-  if (wasHidden) {
-    tabMap.style.cssText = 'display:block;position:fixed;top:-9999px;left:-9999px;width:' +
-      document.getElementById('main-content').offsetWidth + 'px;height:520px;visibility:hidden;';
-  }
-
-  mapInstance = L.map('map', { zoomControl: true, attributionControl: true });
+  mapInstance = L.map('map', {
+    zoomControl: true,
+    attributionControl: true,
+    preferCanvas: true   // canvas renderer avoids some SVG stacking context issues
+  });
   mapInstance.setView([38.5, -122.8], 10); // default: California wine country
 
   // OpenStreetMap basemap
@@ -3279,12 +3290,6 @@ function initMap() {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19, crossOrigin: true
   }).addTo(mapInstance);
-
-  // Restore hidden state — map is fully initialised now
-  if (wasHidden) {
-    tabMap.style.cssText = '';
-    tabMap.style.display = 'none';
-  }
 
   if (geojsonData) renderGeoJSON(getFilteredData());
 }
@@ -3323,13 +3328,14 @@ function renderGeoJSON(filteredData) {
     }
   }).addTo(mapInstance);
 
-  // Fit map to GeoJSON bounds on first load
-  const bounds = geojsonLayer.getBounds();
-  if (bounds.isValid()) {
-    mapInstance.invalidateSize();
-    mapInstance.fitBounds(bounds, { padding: [20, 20] });
-    // Second invalidate after fitBounds settles
-    setTimeout(() => mapInstance?.invalidateSize(), 200);
+  // Fit to bounds on first render only
+  if (!mapInstance._grapeFitted) {
+    const bounds = geojsonLayer.getBounds();
+    if (bounds.isValid()) {
+      mapInstance._grapeFitted = true;
+      // Store bounds for use after invalidateSize
+      mapInstance._grapeBounds = bounds;
+    }
   }
 
   // Build legend
