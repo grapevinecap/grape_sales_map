@@ -1093,7 +1093,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v91</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v92</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -3140,7 +3140,11 @@ document.addEventListener('touchmove', function(e) {
 // Close sidebar on resize to desktop (avoids stuck-open state)
 window.addEventListener('resize', () => {
   if (window.innerWidth > 768) closeMobileSidebar();
-  if (mapInstance && activeTab === 'map') mapInstance.invalidateSize();
+  // Only invalidateSize on genuine window resize, not scroll events
+  if (mapInstance && activeTab === 'map') {
+    clearTimeout(window._mapResizeTimer);
+    window._mapResizeTimer = setTimeout(() => mapInstance.invalidateSize({ animate: false }), 200);
+  }
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -3162,24 +3166,27 @@ function switchTab(tab) {
   document.getElementById('tab-btn-map').classList.toggle('active', tab === 'map');
 
   if (tab === 'map') {
-    if (!mapInstance) {
+    const firstInit = !mapInstance;
+    if (firstInit) {
       const origRetina = L.Browser.retina;
       L.Browser.retina = false;
       initMap();
       L.Browser.retina = origRetina;
     }
-    // invalidateSize then updateMap synchronously
     mapInstance.invalidateSize({ animate: false });
     updateMap();
-    // fitBounds deferred so container is fully painted at correct size
-    setTimeout(() => {
-      const bounds = window._fullExtentBounds || mapInstance._grapeBounds;
-      if (bounds?.isValid()) {
-        mapInstance.invalidateSize({ animate: false }); // second pass after paint
-        mapInstance.fitBounds(bounds, { padding: [20, 20], animate: false });
-        delete mapInstance._grapeBounds;
-      }
-    }, 100);
+    // Only fitBounds on very first switch, and not when flyToBlock triggered the switch
+    if (firstInit && !window._flyToBlockPending) {
+      setTimeout(() => {
+        const bounds = window._fullExtentBounds || mapInstance._grapeBounds;
+        if (bounds?.isValid()) {
+          mapInstance.invalidateSize({ animate: false });
+          mapInstance.fitBounds(bounds, { padding: [20, 20], animate: false });
+          delete mapInstance._grapeBounds;
+        }
+      }, 100);
+    }
+    window._flyToBlockPending = false;
   }
 }
 
@@ -3645,6 +3652,7 @@ function zoomToFullExtent() {
 let flyTimeout = null;
 function flyToBlock(blockCode) {
   if (!blockCode) return;
+  window._flyToBlockPending = true;
   switchTab('map');
   if (!geojsonLayer) return;
   geojsonLayer.eachLayer(layer => {
