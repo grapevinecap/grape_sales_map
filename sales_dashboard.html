@@ -16,9 +16,10 @@
     https://graph.microsoft.com
     https://login.microsoftonline.com
     https://login.microsoft.com
+    https://tile.openstreetmap.org
     https://*.tile.openstreetmap.org
     https://*.basemaps.cartocdn.com;
-  img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com;
+  img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com;
   frame-src https://login.microsoftonline.com;
   frame-ancestors 'none';
   base-uri 'none';
@@ -2949,8 +2950,20 @@ async function loadData() {
 
     // Fetch GeoJSON in parallel (non-blocking — map works without it)
     fetchGeoJSON(token).then(gj => {
-      if (gj) { geojsonData = gj; if (activeTab === 'map') updateMap(); }
-    }).catch(() => {}); // silent — dashboard still works if GeoJSON unavailable
+      if (gj) {
+        geojsonData = gj;
+        if (activeTab === 'map') updateMap();
+      }
+    }).catch(err => {
+      // Show error on map container so it's diagnosable without DevTools
+      const mc = document.getElementById('map-container');
+      if (mc) {
+        const msg = document.createElement('div');
+        msg.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:DM Mono,monospace;font-size:11px;color:#6b1f2a;text-align:center;z-index:999;background:rgba(255,255,255,0.9);padding:12px 16px;border-radius:3px;';
+        msg.textContent = 'Map data unavailable: ' + err.message;
+        mc.appendChild(msg);
+      }
+    });
 
     renderDashboard();
     updateKpiGrid();
@@ -3140,12 +3153,16 @@ const MAP_DEFAULT_COLOR  = { fill: '#aaaaaa', border: '#888888' };
 const MAP_FILTERED_ALPHA = 0.15; // opacity for blocks outside current filter
 
 async function fetchGeoJSON(token) {
-  // Fetch GeoJSON from a different SharePoint site using site-relative path.
-  // Graph API: /sites/{site}/drive/root:/{path}:/content
-  const encodedPath = encodeURIComponent(GEOJSON_PATH).replace(/%2F/g, '/');
+  // Encode each path segment separately so spaces → %20 but slashes stay as /
+  const encodedPath = GEOJSON_PATH.split('/').map(seg => encodeURIComponent(seg)).join('/');
   const url = `https://graph.microsoft.com/v1.0/sites/${GEOJSON_SITE}/drive/root:/${encodedPath}:/content`;
+
   const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-  if (!resp.ok) throw new Error('GeoJSON fetch failed: ' + resp.status);
+  if (!resp.ok) {
+    // Surface the error so it's visible in DevTools console
+    const body = await resp.text().catch(() => '');
+    throw new Error(`GeoJSON fetch failed ${resp.status}: ${body.slice(0, 200)}`);
+  }
   return await resp.json();
 }
 
@@ -3205,11 +3222,12 @@ function blockPopupHTML(blockCode) {
 
 function initMap() {
   mapInstance = L.map('map', { zoomControl: true, attributionControl: true });
+  mapInstance.setView([38.5, -122.8], 10); // default: California wine country
 
-  // Carto light basemap — clean, no API key required
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
-    subdomains: 'abcd', maxZoom: 19
+  // OpenStreetMap basemap
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19, crossOrigin: true
   }).addTo(mapInstance);
 
   if (geojsonData) renderGeoJSON(getFilteredData());
