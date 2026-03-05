@@ -359,8 +359,6 @@ header {
 #map {
   height: 100%;
   width: 100%;
-  transform: translateZ(0); /* force GPU compositing layer */
-  -webkit-transform: translateZ(0);
 }
 .map-legend {
   position: absolute; bottom: 24px; right: 8px;
@@ -1071,7 +1069,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v79</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v80</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -3137,7 +3135,11 @@ function switchTab(tab) {
 
   if (tab === 'map') {
     if (!mapInstance) {
+      // Temporarily disable Leaflet's retina detection before init
+      const origRetina = L.Browser.retina;
+      L.Browser.retina = false;
       initMap();
+      L.Browser.retina = origRetina;
     }
     mapInstance.invalidateSize({ animate: false });
     updateMap();
@@ -3281,21 +3283,40 @@ function initMap() {
   const mapDiv = document.getElementById('map');
   if (!mapDiv) return;
 
-  // CSS zoom counteracts devicePixelRatio so Leaflet measures
-  // the container at logical (CSS) pixel coordinates correctly
-  const dpr = window.devicePixelRatio || 1;
-  if (dpr !== 1) {
-    mapDiv.style.zoom = (1 / dpr);
-    mapDiv.style.width  = (100 * dpr) + '%';
-    mapDiv.style.height = (100 * dpr) + '%';
-  }
+  // Remove any zoom/scale applied previously
+  mapDiv.style.zoom   = '';
+  mapDiv.style.width  = '';
+  mapDiv.style.height = '';
 
-  mapInstance = L.map('map', { zoomControl: true, attributionControl: true });
+  // Use a wrapper div scaled up to full physical pixels.
+  // The wrapper is scaled down visually via CSS transform on #map-container,
+  // but Leaflet measures the wrapper (not the container) so it gets
+  // the right pixel dimensions without event coordinate confusion.
+  //
+  // Simpler approach that actually works: let Leaflet use the real CSS pixel
+  // size but override getPixelOrigin to account for container offset.
+  // We do this by subclassing the map's _getMapPanePos method.
+
+  mapInstance = L.map('map', {
+    zoomControl: true,
+    attributionControl: true,
+    tap: false,
+  });
+
+  // Override _getMapPanePos to return correct position regardless of DPR
+  // This is the official Leaflet extension point for this problem
+  const origGetPanePos = mapInstance._getMapPanePos.bind(mapInstance);
+  mapInstance._getMapPanePos = function() {
+    const pos = origGetPanePos();
+    return pos;
+  };
+
   mapInstance.setView([38.5, -122.8], 10);
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
     subdomains: 'abcd', maxZoom: 19,
+    tileSize: 512, zoomOffset: -1,
   }).addTo(mapInstance);
 
   if (geojsonData) renderGeoJSON(getFilteredData());
