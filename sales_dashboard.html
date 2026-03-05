@@ -352,12 +352,11 @@ header {
   box-shadow: var(--shadow-sm);
   border-radius: 3px;
   position: relative;
-  /* No overflow:hidden — it creates a stacking context that offsets Leaflet tiles */
+  overflow: hidden;
 }
 #map {
   height: 100%;
   width: 100%;
-  border-radius: 3px;
 }
 .map-legend {
   position: absolute; bottom: 24px; right: 8px;
@@ -1068,7 +1067,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v67</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v68</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -2971,12 +2970,7 @@ async function loadData() {
     updateKpiGrid();
     initDragDrop();
 
-    // Init Leaflet while map tab is visible-but-transparent so Leaflet
-    // can measure getBoundingClientRect() without a visible flash
-    const _tabMap  = document.getElementById('tab-map');
-    _tabMap.style.cssText = 'display:block;opacity:0;pointer-events:none;position:absolute;';
-    initMap();
-    _tabMap.style.cssText = '';  // restore to CSS default (display:none)
+    // Map is initialised on first tab switch (see switchTab)
 
     const now = new Date();
     document.getElementById('sync-time').textContent =
@@ -3138,17 +3132,25 @@ function switchTab(tab) {
   document.getElementById('tab-btn-map').classList.toggle('active', tab === 'map');
 
   if (tab === 'map') {
-    // Map is always pre-initialised at load time with correct dimensions.
-    // Just invalidateSize in case the window was resized, then update.
-    requestAnimationFrame(() => {
-      mapInstance?.invalidateSize({ animate: false });
-      updateMap();
-      const bounds = mapInstance?._grapeBounds;
-      if (bounds?.isValid()) {
-        mapInstance.fitBounds(bounds, { padding: [20, 20], animate: false });
-        delete mapInstance._grapeBounds;
-      }
-    });
+    if (!mapInstance) {
+      // Init happens here, after tab is display:block and in its final position
+      // Use setTimeout(0) to let the browser complete the layout pass first
+      setTimeout(() => {
+        initMap();
+        mapInstance.invalidateSize({ animate: false });
+        updateMap();
+        const bounds = mapInstance._grapeBounds;
+        if (bounds?.isValid()) {
+          mapInstance.fitBounds(bounds, { padding: [20, 20], animate: false });
+          delete mapInstance._grapeBounds;
+        }
+      }, 0);
+    } else {
+      requestAnimationFrame(() => {
+        mapInstance.invalidateSize({ animate: false });
+        updateMap();
+      });
+    }
   }
 }
 
