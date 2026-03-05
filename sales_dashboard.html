@@ -3152,14 +3152,25 @@ const MAP_DEFAULT_COLOR  = { fill: '#aaaaaa', border: '#888888' };
 const MAP_FILTERED_ALPHA = 0.15; // opacity for blocks outside current filter
 
 async function fetchGeoJSON(token) {
-  // Same drive as the spreadsheet — fetch directly using DRIVE_ID and file path
+  // Step 1: get item metadata — includes @microsoft.graph.downloadUrl
+  // This pre-authenticated URL bypasses CORS restrictions on the blob storage endpoint
   const encodedPath = GEOJSON_PATH.split('/').map(seg => encodeURIComponent(seg)).join('/');
-  const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/${encodedPath}:/content`;
+  const metaUrl = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/${encodedPath}`;
 
-  const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  const metaResp = await fetch(metaUrl, { headers: { Authorization: 'Bearer ' + token } });
+  if (!metaResp.ok) {
+    const body = await metaResp.text().catch(() => '');
+    throw new Error(`GeoJSON metadata failed ${metaResp.status}: ${body.slice(0, 200)}`);
+  }
+  const meta = await metaResp.json();
+
+  // Step 2: download using the pre-authenticated URL (no auth header needed, no CORS issue)
+  const downloadUrl = meta['@microsoft.graph.downloadUrl'];
+  if (!downloadUrl) throw new Error('No download URL in GeoJSON metadata response');
+
+  const resp = await fetch(downloadUrl);
   if (!resp.ok) {
-    const body = await resp.text().catch(() => '');
-    throw new Error(`GeoJSON fetch failed ${resp.status}: ${body.slice(0, 200)}`);
+    throw new Error(`GeoJSON download failed ${resp.status}`);
   }
   return await resp.json();
 }
