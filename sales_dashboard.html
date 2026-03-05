@@ -3121,15 +3121,13 @@ function switchTab(tab) {
   document.getElementById('tab-btn-map').classList.toggle('active', tab === 'map');
 
   if (tab === 'map') {
-    // Delay slightly so the container is fully visible before Leaflet measures it
-    setTimeout(() => {
-      if (!mapInstance) {
-        initMap();
-      } else {
-        mapInstance.invalidateSize();
-      }
-      updateMap();
-    }, 50);
+    if (!mapInstance) {
+      initMap();
+    }
+    // Invalidate multiple times to handle CSS transitions and reflows
+    setTimeout(() => mapInstance?.invalidateSize(), 0);
+    setTimeout(() => mapInstance?.invalidateSize(), 100);
+    setTimeout(() => { mapInstance?.invalidateSize(); updateMap(); }, 300);
   }
 }
 
@@ -3310,7 +3308,12 @@ function renderGeoJSON(filteredData) {
 
   // Fit map to GeoJSON bounds on first load
   const bounds = geojsonLayer.getBounds();
-  if (bounds.isValid()) mapInstance.fitBounds(bounds, { padding: [20, 20] });
+  if (bounds.isValid()) {
+    mapInstance.invalidateSize();
+    mapInstance.fitBounds(bounds, { padding: [20, 20] });
+    // Second invalidate after fitBounds settles
+    setTimeout(() => mapInstance?.invalidateSize(), 200);
+  }
 
   // Build legend
   buildMapLegend(filteredData);
