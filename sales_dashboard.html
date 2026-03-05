@@ -1069,7 +1069,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v81</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v82</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -3278,7 +3278,6 @@ function blockPopupHTML(blockCode) {
       key   = 'cc';
       label = 'Custom Crush';
     } else {
-      // Open, Mothball, etc.
       key   = 'open';
       label = 'Open';
     }
@@ -3286,7 +3285,14 @@ function blockPopupHTML(blockCode) {
     colMap[key].rows.push(r);
   });
 
-  const cols = Object.values(colMap);
+  // Order: customer columns first (alphabetical), then Custom Crush, then Open
+  const custCols = Object.entries(colMap)
+    .filter(([k]) => k.startsWith('cust_'))
+    .sort(([,a],[,b]) => a.label.localeCompare(b.label))
+    .map(([,v]) => v);
+  const ccCol   = colMap['cc']   ? [colMap['cc']]   : [];
+  const openCol = colMap['open'] ? [colMap['open']] : [];
+  const cols = [...custCols, ...ccCol, ...openCol];
 
   // ── Column stats helper ──────────────────────────────────────
   function colStats(colRows) {
@@ -3330,8 +3336,8 @@ function blockPopupHTML(blockCode) {
     { label: 'Acres',     fn: s => fmt0(s.acres) },
     { label: 'Tons',      fn: s => fmt0(s.tons)  },
     { label: 'T/Acre',    fn: s => s.tpa  > 0 ? s.tpa.toFixed(1)  : '—' },
-    { label: '$/Ton',     fn: s => fmtP(s.ppt)   },
     { label: 'Revenue',   fn: s => s.rev  > 0 ? fmtK(s.rev) : '—' },
+    { label: '$/Ton',     fn: s => fmtP(s.ppt)   },
     { label: 'Status',    fn: (s, col) => {
         // Only show for Sold/Pending columns
         if (!col || col.label === 'Open' || col.label === 'Custom Crush' || col.label === 'Total') return '';
