@@ -1069,7 +1069,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v74</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v75</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -3137,13 +3137,25 @@ function switchTab(tab) {
     setTimeout(() => {
       if (!mapInstance) initMap();
 
-      // Force Leaflet to re-read the container's true screen position.
-      // invalidateSize alone doesn't update _pixelOrigin — we must call
-      // setView which triggers a full recalculation including container offset.
-      const center = mapInstance.getCenter();
-      const zoom   = mapInstance.getZoom();
       mapInstance.invalidateSize({ animate: false });
-      mapInstance.setView(center, zoom, { animate: false, reset: true });
+
+      // Leaflet's pixel origin is consistently off by one tile width (256px)
+      // on the X axis when the container has a non-zero left offset.
+      // Correct it directly by panning exactly 256px east (one tile) in world
+      // pixel space, which re-anchors the tile grid correctly.
+      const orig = mapInstance.getPixelOrigin();
+      const mapEl = document.getElementById('map');
+      const containerRect = mapEl.getBoundingClientRect();
+
+      // Expected X origin = center X - half container width
+      const center = mapInstance.project(mapInstance.getCenter(), mapInstance.getZoom());
+      const expectedX = Math.round(center.x - containerRect.width / 2);
+      const diffX = orig.x - expectedX;
+
+      if (Math.abs(diffX) > 10) {
+        // Pan to correct the offset — convert pixel diff to latlng offset
+        mapInstance.panBy([diffX, 0], { animate: false });
+      }
 
       updateMap();
       const bounds = mapInstance._grapeBounds;
