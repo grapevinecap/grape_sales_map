@@ -3105,6 +3105,7 @@ document.addEventListener('touchmove', function(e) {
 // Close sidebar on resize to desktop (avoids stuck-open state)
 window.addEventListener('resize', () => {
   if (window.innerWidth > 768) closeMobileSidebar();
+  if (mapInstance && activeTab === 'map') mapInstance.invalidateSize();
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -3120,13 +3121,15 @@ function switchTab(tab) {
   document.getElementById('tab-btn-map').classList.toggle('active', tab === 'map');
 
   if (tab === 'map') {
-    // Initialise map on first switch (Leaflet needs visible container)
-    if (!mapInstance) {
-      initMap();
-    } else {
-      mapInstance.invalidateSize();
-    }
-    updateMap();
+    // Delay slightly so the container is fully visible before Leaflet measures it
+    setTimeout(() => {
+      if (!mapInstance) {
+        initMap();
+      } else {
+        mapInstance.invalidateSize();
+      }
+      updateMap();
+    }, 50);
   }
 }
 
@@ -3166,7 +3169,6 @@ async function fetchGeoJSON(token) {
   if (!rows || rows.length === 0)
     throw new Error('GeoJSON sheet appears empty');
 
-  // Join all non-empty values from column A (index 0) into one string
   const raw = rows
     .map(row => (row[0] !== null && row[0] !== undefined) ? String(row[0]) : '')
     .join('');
@@ -3174,18 +3176,30 @@ async function fetchGeoJSON(token) {
   if (!raw.trim())
     throw new Error('GeoJSON sheet all cells empty');
 
-  // Helper: attempt JSON.parse, return null on failure
   const tryParse = str => { try { return JSON.parse(str); } catch(e) { return null; } };
 
-  // Attempt 1: joined string as-is
+  // Attempt 1: as-is
   let result = tryParse(raw);
   if (result) return result;
 
-  // Attempt 2: find first { or [ and last } or ] in case of surrounding whitespace/garbage
-  const s = Math.max(raw.indexOf('{'), raw.indexOf('['));
-  const e2 = Math.max(raw.lastIndexOf('}'), raw.lastIndexOf(']'));
+  // Attempt 2: quote unquoted keys (JS object literal → valid JSON)
+  // Matches word characters before a colon that aren't already quoted
+  const quoted = raw.replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":');
+  result = tryParse(quoted);
+  if (result) return result;
+
+  // Attempt 3: normalize smart quotes then retry
+  let cleaned = quoted
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
+  result = tryParse(cleaned);
+  if (result) return result;
+
+  // Attempt 4: slice from first { to last }
+  const s = Math.max(cleaned.indexOf('{'), cleaned.indexOf('['));
+  const e2 = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
   if (s >= 0 && e2 > s) {
-    result = tryParse(raw.slice(s, e2 + 1));
+    result = tryParse(cleaned.slice(s, e2 + 1));
     if (result) return result;
   }
 
