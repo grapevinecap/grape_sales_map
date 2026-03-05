@@ -1452,10 +1452,8 @@ const ITEM_ID     = '01W4NDSPSK5XQCK4BKXVCJJHZZREBVITH3';
 const SHEET_NAME  = 'Allocation';
 
 // ── MAP CONFIG ───────────────────────────────────────────────
-// GeoJSON file location — fetched via Graph API by site path.
-// GEOJSON_BLOCK_FIELD must match the property name in your
-// GeoJSON features that contains the block code.
-const GEOJSON_PATH     = '2026 Sales/gci_vineyards_2026_clean.geojson'; // path within Shared Documents (same drive as spreadsheet)
+// GeoJSON is stored in the 'GeoJSON' sheet of the same workbook (cell A1)
+// GEOJSON_BLOCK_FIELD must match the property name in your GeoJSON features
 const GEOJSON_BLOCK_FIELD = 'Block Code'; // matches GeoJSON property name
 
 // REDIRECT URI: always resolves to auth-redirect.html on the same origin.
@@ -3152,49 +3150,24 @@ const MAP_DEFAULT_COLOR  = { fill: '#aaaaaa', border: '#888888' };
 const MAP_FILTERED_ALPHA = 0.15; // opacity for blocks outside current filter
 
 async function fetchGeoJSON(token) {
-  // Fetch GeoJSON as text via Graph API (avoids blob storage CORS issues).
-  // The /content endpoint with a Bearer token returns the file directly
-  // when the response is read as text rather than following redirects.
-  const encodedPath = GEOJSON_PATH.split('/').map(seg => encodeURIComponent(seg)).join('/');
-
-  // Try approach 1: fetch content directly with redirect:follow
+  // Read GeoJSON from the 'GeoJSON' sheet in the same workbook, cell A1.
+  // Uses the same usedRange API as the Allocation sheet — no CORS issues,
+  // works from file:// origins with the existing auth token.
+  const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/items/${ITEM_ID}/workbook/worksheets/GeoJSON/usedRange`;
+  const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    throw new Error(`GeoJSON sheet fetch failed ${resp.status}: ${body.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  // GeoJSON text is in cell A1 (values[0][0])
+  const raw = data?.values?.[0]?.[0];
+  if (!raw) throw new Error('GeoJSON sheet appears empty — check cell A1 contains GeoJSON text');
   try {
-    const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/${encodedPath}:/content`;
-    const resp = await fetch(url, {
-      headers: { Authorization: 'Bearer ' + token },
-      redirect: 'follow'
-    });
-    if (resp.ok) {
-      const text = await resp.text();
-      return JSON.parse(text);
-    }
-  } catch(e1) { /* fall through to approach 2 */ }
-
-  // Try approach 2: get metadata downloadUrl, fetch with no-cors mode isn't useful,
-  // so instead read the file via the workbook-adjacent files API
-  // which returns content inline with proper CORS headers
-  const metaUrl = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/${encodedPath}`;
-  const metaResp = await fetch(metaUrl, { headers: { Authorization: 'Bearer ' + token } });
-  if (!metaResp.ok) {
-    const body = await metaResp.text().catch(() => '');
-    throw new Error(`Step 2 metadata ${metaResp.status}: ${body.slice(0,150)}`);
+    return JSON.parse(raw);
+  } catch(e) {
+    throw new Error('GeoJSON sheet A1 is not valid JSON: ' + e.message);
   }
-  const meta = await metaResp.json();
-  const itemId = meta.id;
-  if (!itemId) throw new Error('No item ID in metadata');
-
-  // Approach 3: fetch content by item ID — sometimes returns proper CORS headers
-  const contentUrl = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/items/${itemId}/content`;
-  const contentResp = await fetch(contentUrl, {
-    headers: { Authorization: 'Bearer ' + token },
-    redirect: 'follow'
-  });
-  if (!contentResp.ok) {
-    const body = await contentResp.text().catch(() => '');
-    throw new Error(`Step 3 content ${contentResp.status}: ${body.slice(0,150)}`);
-  }
-  const text = await contentResp.text();
-  return JSON.parse(text);
 }
 
 function buildBlockIndex(data) {
