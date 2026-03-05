@@ -1071,7 +1071,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v78</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v79</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -1392,7 +1392,7 @@ body.sidebar-open {
     <!-- MAP TAB -->
     <div id="tab-map">
       <div id="map-container">
-        <iframe id="map-frame" style="width:100%;height:100%;border:none;display:block;"></iframe>
+        <div id="map"></div>
         <div class="map-legend" id="map-legend"></div>
       </div>
     </div><!-- /#tab-map -->
@@ -3136,11 +3136,15 @@ function switchTab(tab) {
   document.getElementById('tab-btn-map').classList.toggle('active', tab === 'map');
 
   if (tab === 'map') {
-    mapInstance = true; // mark as ready
-    if (geojsonData) {
-      setTimeout(() => sendMapUpdate(getFilteredData(), !window._mapFitted), 100);
-      if (!window._mapFitted) window._mapFitted = true;
-      setTimeout(() => buildMapLegend(getFilteredData()), 150);
+    if (!mapInstance) {
+      initMap();
+    }
+    mapInstance.invalidateSize({ animate: false });
+    updateMap();
+    const bounds = mapInstance._grapeBounds;
+    if (bounds?.isValid()) {
+      mapInstance.fitBounds(bounds, { padding: [20,20], animate: false });
+      delete mapInstance._grapeBounds;
     }
   }
 }
@@ -3149,6 +3153,7 @@ function switchTab(tab) {
 // MAP
 // ═══════════════════════════════════════════════════════════
 let mapInstance    = null;   // Leaflet map
+let geojsonLayer   = null;   // current GeoJSON layer
 let geojsonData    = null;   // raw GeoJSON FeatureCollection
 let blockDataIndex = {};     // blockCode → spreadsheet row(s)
 
@@ -3273,118 +3278,71 @@ function blockPopupHTML(blockCode) {
 }
 
 function initMap() {
-  const frame = document.getElementById('map-frame');
-  if (!frame) return;
+  const mapDiv = document.getElementById('map');
+  if (!mapDiv) return;
 
-  const html = [
-    '<!DOCTYPE html><html><head>',
-    '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">',
-    '<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script>',
-    '<style>html,body,#map{margin:0;padding:0;width:100%;height:100%;overflow:hidden;}',
-    '.map-tooltip{font-family:monospace;font-size:10px;background:#1c1712;color:#f6f1e9;border:none;border-radius:3px;padding:4px 8px;}</style>',
-    '</head><body><div id="map"></div><script>',
-    'var map=L.map("map",{zoomControl:true,attributionControl:true});',
-    'map.setView([38.5,-122.8],10);',
-    'L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{',
-    '  subdomains:"abcd",maxZoom:19',
-    '}).addTo(map);',
-    'var layer=null,SC={"Sold":{fill:"#3d5c38",border:"#2d4428"},"Open":{fill:"#b8881e",border:"#8a6616"},"Custom Crush":{fill:"#4a7c9e",border:"#365c76"},"Pending":{fill:"#7e7060",border:"#5c5246"},"Mothball":{fill:"#6b1f2a",border:"#4a151d"},"FFC":{fill:"#8b5e3c",border:"#63432b"}},DC={fill:"#aaa",border:"#888"};',
-    'window.addEventListener("message",function(e){',
-    '  var m=e.data;',
-    '  if(m.type==="update"){',
-    '    if(layer){layer.remove();layer=null;}',
-    '    if(!m.geojson)return;',
-    '    var fs=new Set(m.filtered||[]);',
-    '    layer=L.geoJSON(m.geojson,{',
-    '      style:function(f){var bc=(f.properties[m.blockField]||"").toUpperCase();var s=m.statusMap[bc];var c=s?(SC[s]||DC):DC;var i=fs.size===0||fs.has(bc);return{fillColor:c.fill,color:c.border,weight:1,fillOpacity:i?0.75:0.15,opacity:i?1:0.3};},',
-    '      onEachFeature:function(f,ly){',
-    '        var bc=f.properties[m.blockField]||"";var info=m.infoMap[bc.toUpperCase()]||{};',
-    '        ly.on("mouseover",function(ev){ly.bindTooltip(info.name||bc,{sticky:true,className:"map-tooltip"}).openTooltip(ev.latlng);});',
-    '        ly.on("mouseout",function(){ly.closeTooltip();});',
-    '        ly.on("click",function(ev){',
-    '          var h="<div style=\"font-family:monospace;font-size:11px;min-width:160px;\"><b>"+bc+"</b><br>";',
-    '          if(info.tons)h+="Tons: "+info.tons+"<br>";',
-    '          if(info.acres)h+="Acres: "+info.acres+"<br>";',
-    '          if(info.ppt)h+="$/Ton: $"+info.ppt+"<br>";',
-    '          if(info.revenue)h+="Revenue: "+info.revenue+"<br>";',
-    '          if(info.status)h+="Status: "+info.status+"<br>";',
-    '          if(info.customer)h+="Customer: "+info.customer+"<br>";',
-    '          h+="</div>";',
-    '          ly.bindPopup(h,{maxWidth:260}).openPopup(ev.latlng);',
-    '        });',
-    '      }',
-    '    }).addTo(map);',
-    '    if(m.fitBounds){var b=layer.getBounds();if(b.isValid())map.fitBounds(b,{padding:[20,20]});}',
-    '  } else if(m.type==="flyTo"){',
-    '    if(!layer)return;',
-    '    layer.eachLayer(function(ly){',
-    '      var bc=(ly.feature&&ly.feature.properties[m.blockField])||"";',
-    '      if(bc.toUpperCase()!==m.blockCode)return;',
-    '      var b=ly.getBounds&&ly.getBounds();',
-    '      if(b&&b.isValid())map.flyToBounds(b,{padding:[60,60],duration:0.8});',
-    '      setTimeout(function(){var c=b&&b.getCenter&&b.getCenter();if(c)ly.bindPopup(m.popup,{maxWidth:280}).openPopup(c);},900);',
-    '    });',
-    '  }',
-    '});',
-    '<\/script></body></html>'
-  ].join('\n');
+  // CSS zoom counteracts devicePixelRatio so Leaflet measures
+  // the container at logical (CSS) pixel coordinates correctly
+  const dpr = window.devicePixelRatio || 1;
+  if (dpr !== 1) {
+    mapDiv.style.zoom = (1 / dpr);
+    mapDiv.style.width  = (100 * dpr) + '%';
+    mapDiv.style.height = (100 * dpr) + '%';
+  }
 
-  // Write content directly into the iframe document
-  frame.onload = null; // prevent recursion
-  const doc = frame.contentDocument || frame.contentWindow.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
-  mapInstance = true;
+  mapInstance = L.map('map', { zoomControl: true, attributionControl: true });
+  mapInstance.setView([38.5, -122.8], 10);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd', maxZoom: 19,
+  }).addTo(mapInstance);
+
+  if (geojsonData) renderGeoJSON(getFilteredData());
 }
 
 function renderGeoJSON(filteredData) {
   if (!mapInstance || !geojsonData) return;
-  sendMapUpdate(filteredData, !window._mapFitted);
-  if (!window._mapFitted) window._mapFitted = true;
+  if (geojsonLayer) { geojsonLayer.remove(); geojsonLayer = null; }
+
+  geojsonLayer = L.geoJSON(geojsonData, {
+    style: feature => {
+      const bc     = feature.properties[GEOJSON_BLOCK_FIELD] || '';
+      const status = getBlockStatus(bc);
+      const colors = status ? (MAP_STATUS_COLORS[status] || MAP_DEFAULT_COLOR) : MAP_DEFAULT_COLOR;
+      const inFilter = isBlockInFilter(bc, filteredData);
+      return {
+        fillColor:   colors.fill,
+        color:       colors.border,
+        weight:      1,
+        fillOpacity: inFilter ? 0.75 : MAP_FILTERED_ALPHA,
+        opacity:     inFilter ? 1    : 0.3,
+      };
+    },
+    onEachFeature: (feature, layer) => {
+      const bc = feature.properties[GEOJSON_BLOCK_FIELD] || '';
+      layer.on({
+        mouseover: e => {
+          const rows = blockDataIndex[bc.trim().toUpperCase()];
+          const name = rows?.[0] ? `${rows[0].vineyard} – ${rows[0].block}` : bc;
+          layer.bindTooltip(name, { sticky: true, className: 'map-tooltip' }).openTooltip(e.latlng);
+        },
+        mouseout: () => layer.closeTooltip(),
+        click: e => {
+          layer.bindPopup(blockPopupHTML(bc), { maxWidth: 280 }).openPopup(e.latlng);
+        },
+      });
+    }
+  }).addTo(mapInstance);
+
+  if (!window._mapFitted) {
+    const bounds = geojsonLayer.getBounds();
+    if (bounds.isValid()) {
+      mapInstance._grapeBounds = bounds;
+      window._mapFitted = true;
+    }
+  }
   buildMapLegend(filteredData);
-}
-
-function sendMapUpdate(filteredData, fitBounds) {
-  const frame = document.getElementById('map-frame');
-  if (!frame || !geojsonData) return;
-
-  // Build status map: blockCode → status
-  const statusMap = {};
-  Object.entries(blockDataIndex).forEach(([bc, rows]) => {
-    statusMap[bc] = getBlockStatus(bc);
-  });
-
-  // Build info map: blockCode → popup data
-  const infoMap = {};
-  Object.entries(blockDataIndex).forEach(([bc, rows]) => {
-    const totalTons  = rows.reduce((s,r) => s + r.tons, 0);
-    const totalAcres = rows.reduce((s,r) => s + r.acres, 0);
-    const totalRev   = rows.reduce((s,r) => s + r.revenue, 0);
-    const wtdPPT     = totalTons > 0 ? Math.round(totalRev / totalTons) : 0;
-    const customers  = [...new Set(rows.map(r => r.customer).filter(Boolean))].join(', ');
-    infoMap[bc] = {
-      name:     rows[0] ? `${rows[0].vineyard} – ${rows[0].block}` : bc,
-      tons:     fmtN(totalTons),
-      acres:    fmtN(totalAcres),
-      ppt:      fmtN(wtdPPT),
-      revenue:  fmtK(totalRev),
-      status:   statusMap[bc] || '',
-      customer: customers,
-    };
-  });
-
-  const filteredCodes = new Set(filteredData.map(d => (d.blockCode||'').toUpperCase()));
-
-  frame.contentWindow.postMessage({
-    type: 'update',
-    geojson: geojsonData,
-    blockField: GEOJSON_BLOCK_FIELD,
-    filtered: [...filteredCodes],
-    statusMap,
-    infoMap,
-    fitBounds: !!fitBounds,
-  }, '*');
 }
 
 function buildMapLegend(filteredData) {
@@ -3406,19 +3364,22 @@ function updateMap() {
   renderGeoJSON(getFilteredData());
 }
 
+let flyTimeout = null;
 function flyToBlock(blockCode) {
   if (!blockCode) return;
   switchTab('map');
-  const frame = document.getElementById('map-frame');
-  if (!frame) return;
-  setTimeout(() => {
-    frame.contentWindow.postMessage({
-      type: 'flyTo',
-      blockCode: blockCode.trim().toUpperCase(),
-      blockField: GEOJSON_BLOCK_FIELD,
-      popup: blockPopupHTML(blockCode),
-    }, '*');
-  }, 150);
+  if (!geojsonLayer) return;
+  geojsonLayer.eachLayer(layer => {
+    const bc = layer.feature?.properties[GEOJSON_BLOCK_FIELD] || '';
+    if (bc.trim().toUpperCase() !== blockCode.trim().toUpperCase()) return;
+    const bounds = layer.getBounds?.();
+    if (bounds?.isValid()) mapInstance.flyToBounds(bounds, { padding: [60,60], duration: 0.8 });
+    clearTimeout(flyTimeout);
+    flyTimeout = setTimeout(() => {
+      const center = bounds?.getCenter?.();
+      if (center) layer.bindPopup(blockPopupHTML(blockCode), { maxWidth: 280 }).openPopup(center);
+    }, 900);
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
