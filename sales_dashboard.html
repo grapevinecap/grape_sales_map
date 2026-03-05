@@ -3152,27 +3152,49 @@ const MAP_DEFAULT_COLOR  = { fill: '#aaaaaa', border: '#888888' };
 const MAP_FILTERED_ALPHA = 0.15; // opacity for blocks outside current filter
 
 async function fetchGeoJSON(token) {
-  // Step 1: get item metadata — includes @microsoft.graph.downloadUrl
-  // This pre-authenticated URL bypasses CORS restrictions on the blob storage endpoint
+  // Fetch GeoJSON as text via Graph API (avoids blob storage CORS issues).
+  // The /content endpoint with a Bearer token returns the file directly
+  // when the response is read as text rather than following redirects.
   const encodedPath = GEOJSON_PATH.split('/').map(seg => encodeURIComponent(seg)).join('/');
-  const metaUrl = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/${encodedPath}`;
 
+  // Try approach 1: fetch content directly with redirect:follow
+  try {
+    const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/${encodedPath}:/content`;
+    const resp = await fetch(url, {
+      headers: { Authorization: 'Bearer ' + token },
+      redirect: 'follow'
+    });
+    if (resp.ok) {
+      const text = await resp.text();
+      return JSON.parse(text);
+    }
+  } catch(e1) { /* fall through to approach 2 */ }
+
+  // Try approach 2: get metadata downloadUrl, fetch with no-cors mode isn't useful,
+  // so instead read the file via the workbook-adjacent files API
+  // which returns content inline with proper CORS headers
+  const metaUrl = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/${encodedPath}`;
   const metaResp = await fetch(metaUrl, { headers: { Authorization: 'Bearer ' + token } });
   if (!metaResp.ok) {
     const body = await metaResp.text().catch(() => '');
-    throw new Error(`GeoJSON metadata failed ${metaResp.status}: ${body.slice(0, 200)}`);
+    throw new Error(`Step 2 metadata ${metaResp.status}: ${body.slice(0,150)}`);
   }
   const meta = await metaResp.json();
+  const itemId = meta.id;
+  if (!itemId) throw new Error('No item ID in metadata');
 
-  // Step 2: download using the pre-authenticated URL (no auth header needed, no CORS issue)
-  const downloadUrl = meta['@microsoft.graph.downloadUrl'];
-  if (!downloadUrl) throw new Error('No download URL in GeoJSON metadata response');
-
-  const resp = await fetch(downloadUrl);
-  if (!resp.ok) {
-    throw new Error(`GeoJSON download failed ${resp.status}`);
+  // Approach 3: fetch content by item ID — sometimes returns proper CORS headers
+  const contentUrl = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/items/${itemId}/content`;
+  const contentResp = await fetch(contentUrl, {
+    headers: { Authorization: 'Bearer ' + token },
+    redirect: 'follow'
+  });
+  if (!contentResp.ok) {
+    const body = await contentResp.text().catch(() => '');
+    throw new Error(`Step 3 content ${contentResp.status}: ${body.slice(0,150)}`);
   }
-  return await resp.json();
+  const text = await contentResp.text();
+  return JSON.parse(text);
 }
 
 function buildBlockIndex(data) {
