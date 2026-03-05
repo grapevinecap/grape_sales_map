@@ -3161,32 +3161,35 @@ async function fetchGeoJSON(token) {
     throw new Error(`GeoJSON sheet fetch failed ${resp.status}: ${body.slice(0, 200)}`);
   }
   const data = await resp.json();
-  // GeoJSON text is in cell A1 (values[0][0])
-  const rawVal = data?.values?.[0]?.[0];
-  if (rawVal === null || rawVal === undefined || rawVal === '')
-    throw new Error('GeoJSON sheet appears empty - check cell A1 contains GeoJSON text');
+  // GeoJSON is spread across multiple rows in column A — concatenate all rows
+  const rows = data?.values;
+  if (!rows || rows.length === 0)
+    throw new Error('GeoJSON sheet appears empty');
 
-  const raw = String(rawVal);
+  // Join all non-empty values from column A (index 0) into one string
+  const raw = rows
+    .map(row => (row[0] !== null && row[0] !== undefined) ? String(row[0]) : '')
+    .join('');
 
-  // Attempt 1: parse as-is
-  try { return JSON.parse(raw); } catch(e1) { /* try cleaning */ }
+  if (!raw.trim())
+    throw new Error('GeoJSON sheet all cells empty');
 
-  // Attempt 2: normalize common Excel character substitutions
-  let cleaned = raw;
-  cleaned = cleaned.replace(/\u201C|\u201D|\u201E|\u201F|\u2033|\u2036/g, '"');
-  cleaned = cleaned.replace(/\u2018|\u2019|\u201A|\u201B|\u2032|\u2035/g, "'");
-  cleaned = cleaned.replace(/\u2013|\u2014/g, '-');
-  cleaned = cleaned.replace(/\r\n|\r/g, '\n');
-  try { return JSON.parse(cleaned); } catch(e2) { /* try further */ }
+  // Helper: attempt JSON.parse, return null on failure
+  const tryParse = str => { try { return JSON.parse(str); } catch(e) { return null; } };
 
-  // Attempt 3: strip leading/trailing non-JSON garbage characters
-  const start2 = Math.max(cleaned.indexOf('{'), cleaned.indexOf('['));
-  const end2   = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
-  if (start2 >= 0 && end2 > start2) {
-    try { return JSON.parse(cleaned.slice(start2, end2 + 1)); } catch(e3) {}
+  // Attempt 1: joined string as-is
+  let result = tryParse(raw);
+  if (result) return result;
+
+  // Attempt 2: find first { or [ and last } or ] in case of surrounding whitespace/garbage
+  const s = Math.max(raw.indexOf('{'), raw.indexOf('['));
+  const e2 = Math.max(raw.lastIndexOf('}'), raw.lastIndexOf(']'));
+  if (s >= 0 && e2 > s) {
+    result = tryParse(raw.slice(s, e2 + 1));
+    if (result) return result;
   }
 
-  throw new Error('GeoJSON parse failed. Raw start: ' + JSON.stringify(raw.slice(0, 80)));
+  throw new Error('GeoJSON parse failed. Raw[0..120]: ' + JSON.stringify(raw.slice(0, 120)));
 }
 
 
