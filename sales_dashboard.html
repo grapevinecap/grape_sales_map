@@ -19,7 +19,7 @@
     https://tile.openstreetmap.org
     https://*.tile.openstreetmap.org
     https://*.basemaps.cartocdn.com;
-  img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com;
+  img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.cartocdn.com;
   frame-src https://login.microsoftonline.com;
   frame-ancestors 'none';
   base-uri 'none';
@@ -357,6 +357,8 @@ header {
 #map {
   height: 100%;
   width: 100%;
+  transform: translateZ(0); /* force GPU compositing layer */
+  -webkit-transform: translateZ(0);
 }
 .map-legend {
   position: absolute; bottom: 24px; right: 8px;
@@ -1067,7 +1069,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v72</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v73</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -3296,15 +3298,11 @@ function initMap() {
   });
   mapInstance.setView([38.5, -122.8], 10); // default: California wine country
 
-  // tileSize:512 + zoomOffset:-1 is the standard Leaflet fix for retina displays.
-  // Requests tiles one zoom level lower and displays them at 512px CSS size,
-  // giving the same visual result as 256px tiles but without DPR spacing gaps.
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 18,
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19,
     crossOrigin: true,
-    tileSize: 512,
-    zoomOffset: -1,
   }).addTo(mapInstance);
 
   if (geojsonData) renderGeoJSON(getFilteredData());
