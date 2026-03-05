@@ -1067,7 +1067,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v68</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v69</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -3132,25 +3132,28 @@ function switchTab(tab) {
   document.getElementById('tab-btn-map').classList.toggle('active', tab === 'map');
 
   if (tab === 'map') {
-    if (!mapInstance) {
-      // Init happens here, after tab is display:block and in its final position
-      // Use setTimeout(0) to let the browser complete the layout pass first
-      setTimeout(() => {
+    // Use 100ms delay — enough for layout to fully settle with correct
+    // getBoundingClientRect() before Leaflet measures the container.
+    // Then force a full tile grid reset, not just invalidateSize.
+    const doMapShow = () => {
+      if (!mapInstance) {
         initMap();
-        mapInstance.invalidateSize({ animate: false });
-        updateMap();
-        const bounds = mapInstance._grapeBounds;
-        if (bounds?.isValid()) {
-          mapInstance.fitBounds(bounds, { padding: [20, 20], animate: false });
-          delete mapInstance._grapeBounds;
-        }
-      }, 0);
-    } else {
-      requestAnimationFrame(() => {
-        mapInstance.invalidateSize({ animate: false });
-        updateMap();
-      });
-    }
+      }
+      // Step 1: invalidateSize so Leaflet remeasures container dimensions
+      mapInstance.invalidateSize({ animate: false });
+      // Step 2: _resetView forces a full tile grid recalculation from scratch,
+      // including re-reading the container's getBoundingClientRect().left offset.
+      // This is the definitive fix for devicePixelRatio + container offset issues.
+      mapInstance._resetView(mapInstance.getCenter(), mapInstance.getZoom(), true);
+      // Step 3: update polygons and fit bounds
+      updateMap();
+      const bounds = mapInstance._grapeBounds;
+      if (bounds?.isValid()) {
+        mapInstance.fitBounds(bounds, { padding: [20, 20], animate: false });
+        delete mapInstance._grapeBounds;
+      }
+    };
+    setTimeout(doMapShow, 100);
   }
 }
 
