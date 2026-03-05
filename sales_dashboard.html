@@ -342,7 +342,7 @@ header {
   border-bottom-color: var(--wine);
 }
 #tab-dashboard { display: block; }
-#tab-map       { display: none; }
+#tab-map       { display: none; }  /* controlled by switchTab() */
 
 /* ── MAP ── */
 #map-container {
@@ -1068,7 +1068,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v66</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v67</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -2971,15 +2971,12 @@ async function loadData() {
     updateKpiGrid();
     initDragDrop();
 
-    // Init Leaflet while map tab is briefly visible so it measures
-    // the correct container position (getBoundingClientRect needs display:block)
+    // Init Leaflet while map tab is visible-but-transparent so Leaflet
+    // can measure getBoundingClientRect() without a visible flash
     const _tabMap  = document.getElementById('tab-map');
-    const _tabDash = document.getElementById('tab-dashboard');
-    _tabMap.style.display  = 'block';
-    _tabDash.style.display = 'none';
+    _tabMap.style.cssText = 'display:block;opacity:0;pointer-events:none;position:absolute;';
     initMap();
-    _tabMap.style.display  = 'none';
-    _tabDash.style.display = 'block';
+    _tabMap.style.cssText = '';  // restore to CSS default (display:none)
 
     const now = new Date();
     document.getElementById('sync-time').textContent =
@@ -3129,8 +3126,14 @@ let activeTab = 'dashboard';
 
 function switchTab(tab) {
   activeTab = tab;
-  document.getElementById('tab-dashboard').style.display = tab === 'dashboard' ? 'block' : 'none';
-  document.getElementById('tab-map').style.display       = tab === 'map'       ? 'block' : 'none';
+  // Hide both first, then show the correct one — prevents overlap
+  document.getElementById('tab-dashboard').style.display = 'none';
+  document.getElementById('tab-map').style.display       = 'none';
+  if (tab === 'dashboard') {
+    document.getElementById('tab-dashboard').style.display = 'block';
+  } else {
+    document.getElementById('tab-map').style.display = 'block';
+  }
   document.getElementById('tab-btn-dashboard').classList.toggle('active', tab === 'dashboard');
   document.getElementById('tab-btn-map').classList.toggle('active', tab === 'map');
 
