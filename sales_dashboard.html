@@ -1067,7 +1067,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v69</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v71</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -3132,28 +3132,31 @@ function switchTab(tab) {
   document.getElementById('tab-btn-map').classList.toggle('active', tab === 'map');
 
   if (tab === 'map') {
-    // Use 100ms delay — enough for layout to fully settle with correct
-    // getBoundingClientRect() before Leaflet measures the container.
-    // Then force a full tile grid reset, not just invalidateSize.
-    const doMapShow = () => {
+    setTimeout(() => {
+      const mapContainer = document.getElementById('map-container');
+
       if (!mapInstance) {
+        // Pin container to top-left during init so getBoundingClientRect
+        // returns {left:0, top:0} — Leaflet then builds tile grid from origin.
+        // We correct the offset afterwards with invalidateSize + _resetView.
+        const origStyle = mapContainer.style.cssText;
+        mapContainer.style.cssText = 'position:fixed;top:0;left:0;width:' +
+          mapContainer.offsetWidth + 'px;height:' + mapContainer.offsetHeight + 'px;';
         initMap();
+        mapContainer.style.cssText = origStyle;
       }
-      // Step 1: invalidateSize so Leaflet remeasures container dimensions
+
+      // After restoring position, force Leaflet to re-read the real offset
       mapInstance.invalidateSize({ animate: false });
-      // Step 2: _resetView forces a full tile grid recalculation from scratch,
-      // including re-reading the container's getBoundingClientRect().left offset.
-      // This is the definitive fix for devicePixelRatio + container offset issues.
       mapInstance._resetView(mapInstance.getCenter(), mapInstance.getZoom(), true);
-      // Step 3: update polygons and fit bounds
+
       updateMap();
       const bounds = mapInstance._grapeBounds;
       if (bounds?.isValid()) {
         mapInstance.fitBounds(bounds, { padding: [20, 20], animate: false });
         delete mapInstance._grapeBounds;
       }
-    };
-    setTimeout(doMapShow, 100);
+    }, 50);
   }
 }
 
@@ -3289,14 +3292,17 @@ function initMap() {
   mapInstance = L.map('map', {
     zoomControl: true,
     attributionControl: true,
-    preferCanvas: true   // canvas renderer avoids some SVG stacking context issues
+    tap: false,
   });
   mapInstance.setView([38.5, -122.8], 10); // default: California wine country
 
-  // OpenStreetMap basemap
+  // detectRetina:false prevents devicePixelRatio:2 from causing tile grid gaps
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 19, crossOrigin: true
+    maxZoom: 19,
+    crossOrigin: true,
+    detectRetina: false,
+    tileSize: 256,
   }).addTo(mapInstance);
 
   if (geojsonData) renderGeoJSON(getFilteredData());
