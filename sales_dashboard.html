@@ -2404,8 +2404,8 @@ function scaleKpiText() {
 // ═══════════════════════════════════════════════════════════
 function renderDashboard() {
   const data = getFilteredData();
-  // Keep map in sync with filters
-  if (activeTab === 'map') updateMap();
+  // Keep map in sync with filters (only if map is ready)
+  if (activeTab === 'map' && mapInstance && geojsonData) updateMap();
 
   // ── KPIs ──
   const totalRev   = data.reduce((s,d) => s + d.revenue, 0);
@@ -2945,19 +2945,20 @@ async function loadData() {
     applyInitialVisibility();
     buildBlockIndex(ALL_DATA);  // index for map lookups
 
-    // Fetch GeoJSON in parallel (non-blocking — map works without it)
-    fetchGeoJSON(token).then(gj => {
+    // Fetch GeoJSON in parallel — fully isolated, never affects main dashboard load
+    Promise.resolve().then(() => fetchGeoJSON(token)).then(gj => {
       if (gj) {
         geojsonData = gj;
-        if (activeTab === 'map') updateMap();
+        if (activeTab === 'map' && mapInstance) updateMap();
       }
     }).catch(err => {
-      // Show error on map container so it's diagnosable without DevTools
+      // Store error message — shown when user switches to map tab
+      window._geojsonError = 'Map data unavailable: ' + err.message;
       const mc = document.getElementById('map-container');
       if (mc) {
         const msg = document.createElement('div');
-        msg.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:DM Mono,monospace;font-size:11px;color:#6b1f2a;text-align:center;z-index:999;background:rgba(255,255,255,0.9);padding:12px 16px;border-radius:3px;';
-        msg.textContent = 'Map data unavailable: ' + err.message;
+        msg.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:DM Mono,monospace;font-size:11px;color:#6b1f2a;text-align:center;z-index:999;background:rgba(255,255,255,0.9);padding:12px 16px;border-radius:3px;max-width:80%;';
+        msg.textContent = window._geojsonError;
         mc.appendChild(msg);
       }
     });
@@ -3161,29 +3162,33 @@ async function fetchGeoJSON(token) {
   }
   const data = await resp.json();
   // GeoJSON text is in cell A1 (values[0][0])
-  const raw = data?.values?.[0]?.[0];
-  if (!raw) throw new Error('GeoJSON sheet appears empty — check cell A1 contains GeoJSON text');
-  try {
-    return JSON.parse(raw);
-  } catch(e) {
-    // Excel commonly replaces straight quotes with curly/smart quotes.
-    // Normalize them back before retrying.
-    const cleaned = raw
-      .replace(/[“”„‟″‶]/g, '"') // curly double quotes → "
-      .replace(/[‘’‚‛′‵]/g, "'") // curly single quotes → '
-      .replace(/–|—/g, '-')   // em/en dash → hyphen
-      .replace(/
-|/g, '
-');       // normalize line endings
-    try {
-      return JSON.parse(cleaned);
-    } catch(e2) {
-      // Show the first 60 chars of raw so we can see what Excel returned
-      throw new Error('GeoJSON sheet A1 is not valid JSON: ' + e2.message +
-        ' | Raw start: ' + JSON.stringify(raw.slice(0, 60)));
-    }
+  const rawVal = data?.values?.[0]?.[0];
+  if (rawVal === null || rawVal === undefined || rawVal === '')
+    throw new Error('GeoJSON sheet appears empty - check cell A1 contains GeoJSON text');
+
+  const raw = String(rawVal);
+
+  // Attempt 1: parse as-is
+  try { return JSON.parse(raw); } catch(e1) { /* try cleaning */ }
+
+  // Attempt 2: normalize common Excel character substitutions
+  let cleaned = raw;
+  cleaned = cleaned.replace(/\u201C|\u201D|\u201E|\u201F|\u2033|\u2036/g, '"');
+  cleaned = cleaned.replace(/\u2018|\u2019|\u201A|\u201B|\u2032|\u2035/g, "'");
+  cleaned = cleaned.replace(/\u2013|\u2014/g, '-');
+  cleaned = cleaned.replace(/\r\n|\r/g, '\n');
+  try { return JSON.parse(cleaned); } catch(e2) { /* try further */ }
+
+  // Attempt 3: strip leading/trailing non-JSON garbage characters
+  const start2 = Math.max(cleaned.indexOf('{'), cleaned.indexOf('['));
+  const end2   = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
+  if (start2 >= 0 && end2 > start2) {
+    try { return JSON.parse(cleaned.slice(start2, end2 + 1)); } catch(e3) {}
   }
+
+  throw new Error('GeoJSON parse failed. Raw start: ' + JSON.stringify(raw.slice(0, 80)));
 }
+
 
 function buildBlockIndex(data) {
   blockDataIndex = {};
