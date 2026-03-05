@@ -1069,7 +1069,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v80</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v81</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -3255,26 +3255,110 @@ function blockPopupHTML(blockCode) {
   const rows = blockDataIndex[(blockCode || '').trim().toUpperCase()];
   if (!rows || rows.length === 0) return `<div style="font-family:'DM Mono',monospace;font-size:11px;"><b>${esc(blockCode)}</b><br><span style="color:#7e7060">No data matched</span></div>`;
 
-  const totalTons  = rows.reduce((s,r) => s + r.tons, 0);
-  const totalAcres = rows.reduce((s,r) => s + r.acres, 0);
-  const totalRev   = rows.reduce((s,r) => s + r.revenue, 0);
-  const wtdPPT     = totalTons > 0 ? totalRev / totalTons : 0;
-  const customers  = [...new Set(rows.map(r => r.customer).filter(Boolean))].join(', ');
-  const statuses   = [...new Set(rows.map(r => r.status))].join(', ');
-  const vineyard   = rows[0].vineyard;
-  const block      = rows[0].block;
-  const varietal   = [...new Set(rows.map(r => r.varietal).filter(Boolean))].join(', ');
+  const vineyard = rows[0].vineyard;
+  const block    = rows[0].block;
+  const varietal = [...new Set(rows.map(r => r.varietal).filter(Boolean))].join(', ');
 
-  return `<div style="font-family:'DM Mono',monospace;font-size:11px;min-width:180px;">
-    <div style="font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:500;margin-bottom:6px;color:#1c1712;">${esc(vineyard)}</div>
-    <div style="color:#7e7060;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">${esc(block)} · ${esc(varietal)}</div>
-    <table style="width:100%;border-collapse:collapse;font-size:10px;">
-      <tr><td style="color:#7e7060;padding:2px 8px 2px 0;">Acres</td><td style="text-align:right;">${fmtN(totalAcres)}</td></tr>
-      <tr><td style="color:#7e7060;padding:2px 8px 2px 0;">Tons</td><td style="text-align:right;">${fmtN(totalTons)}</td></tr>
-      <tr><td style="color:#7e7060;padding:2px 8px 2px 0;">$/Ton</td><td style="text-align:right;">$${fmtN(wtdPPT)}</td></tr>
-      <tr><td style="color:#7e7060;padding:2px 8px 2px 0;">Revenue</td><td style="text-align:right;">${fmtK(totalRev)}</td></tr>
-      <tr><td style="color:#7e7060;padding:2px 8px 2px 0;">Status</td><td style="text-align:right;">${esc(statuses)}</td></tr>
-      ${customers ? `<tr><td style="color:#7e7060;padding:2px 8px 2px 0;">Customer</td><td style="text-align:right;">${esc(customers)}</td></tr>` : ''}
+  // ── Build columns ────────────────────────────────────────────
+  // Column types:
+  //   Sold/Pending rows → one column per customer (labelled with customer name)
+  //   Custom Crush rows → one "Custom Crush" column
+  //   Open rows         → one "Open" column
+  //   Total             → only if more than one column
+
+  const colMap = {}; // key → { label, rows[] }
+
+  rows.forEach(r => {
+    const st = (r.status || '').trim();
+    let key, label;
+    if (st === 'Sold' || st === 'Pending') {
+      key   = 'cust_' + (r.customer || 'Unknown');
+      label = r.customer || 'Unknown';
+    } else if (st === 'Custom Crush' || st === 'CC') {
+      key   = 'cc';
+      label = 'Custom Crush';
+    } else {
+      // Open, Mothball, etc.
+      key   = 'open';
+      label = 'Open';
+    }
+    if (!colMap[key]) colMap[key] = { label, rows: [] };
+    colMap[key].rows.push(r);
+  });
+
+  const cols = Object.values(colMap);
+
+  // ── Column stats helper ──────────────────────────────────────
+  function colStats(colRows) {
+    const tons    = colRows.reduce((s,r) => s + r.tons,    0);
+    const acres   = colRows.reduce((s,r) => s + r.acres,   0);
+    const rev     = colRows.reduce((s,r) => s + r.revenue, 0);
+    const ppt     = tons  > 0 ? rev  / tons  : 0;
+    const tpa     = acres > 0 ? tons / acres : 0;
+    const statuses = [...new Set(colRows.map(r => r.status)
+      .filter(s => s === 'Sold' || s === 'Pending'))];
+    return { tons, acres, rev, ppt, tpa, statuses };
+  }
+
+  // ── CSS helpers ──────────────────────────────────────────────
+  const S = {
+    th:   'padding:4px 8px;text-align:right;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#7e7060;border-bottom:1px solid #e4dcc8;font-weight:400;white-space:nowrap;',
+    thL:  'padding:4px 8px 4px 0;text-align:left;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#7e7060;border-bottom:1px solid #e4dcc8;font-weight:400;',
+    td:   'padding:3px 8px;text-align:right;font-size:10px;white-space:nowrap;',
+    tdL:  'padding:3px 8px 3px 0;text-align:left;font-size:9px;color:#7e7060;white-space:nowrap;',
+    tdT:  'padding:3px 8px;text-align:right;font-size:10px;font-weight:500;white-space:nowrap;border-top:1px solid #e4dcc8;',
+    tdTL: 'padding:3px 8px 3px 0;text-align:left;font-size:9px;color:#7e7060;font-weight:500;white-space:nowrap;border-top:1px solid #e4dcc8;',
+  };
+
+  const fmt0 = v => v > 0 ? fmtN(v) : '—';
+  const fmtP = v => v > 0 ? '$' + fmtN(v) : '—';
+  const fmtT = v => v > 0 ? fmtN(v) : '—';
+
+  // ── Build column header row ──────────────────────────────────
+  const showTotal = cols.length > 1;
+  const allCols   = showTotal ? [...cols, { label: 'Total', rows }] : cols;
+
+  let headerRow = `<tr><th style="${S.thL}"></th>`;
+  allCols.forEach((col, i) => {
+    const isTotal = showTotal && i === allCols.length - 1;
+    headerRow += `<th style="${S.th}${isTotal ? 'color:#1c1712;font-weight:500;' : ''}">${esc(col.label)}</th>`;
+  });
+  headerRow += '</tr>';
+
+  // ── Build data rows ──────────────────────────────────────────
+  const metrics = [
+    { label: 'Acres',     fn: s => fmt0(s.acres) },
+    { label: 'Tons',      fn: s => fmt0(s.tons)  },
+    { label: 'T/Acre',    fn: s => s.tpa  > 0 ? s.tpa.toFixed(1)  : '—' },
+    { label: '$/Ton',     fn: s => fmtP(s.ppt)   },
+    { label: 'Revenue',   fn: s => s.rev  > 0 ? fmtK(s.rev) : '—' },
+    { label: 'Status',    fn: (s, col) => {
+        // Only show for Sold/Pending columns
+        if (!col || col.label === 'Open' || col.label === 'Custom Crush' || col.label === 'Total') return '';
+        return s.statuses.join(', ') || '';
+      }
+    },
+  ];
+
+  let dataRows = '';
+  metrics.forEach(m => {
+    dataRows += `<tr><td style="${S.tdL}">${m.label}</td>`;
+    allCols.forEach((col, i) => {
+      const isTotal = showTotal && i === allCols.length - 1;
+      const s = colStats(col.rows);
+      const val = m.fn(s, col);
+      dataRows += `<td style="${isTotal ? S.tdT : S.td}">${val}</td>`;
+    });
+    dataRows += '</tr>';
+  });
+
+  // ── Assemble ─────────────────────────────────────────────────
+  return `<div style="font-family:'DM Mono',monospace;font-size:11px;">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:500;margin-bottom:4px;color:#1c1712;">${esc(vineyard)}</div>
+    <div style="color:#7e7060;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px;">${esc(block)} · ${esc(varietal)}</div>
+    <table style="width:100%;border-collapse:collapse;">
+      ${headerRow}
+      ${dataRows}
     </table>
   </div>`;
 }
@@ -3350,7 +3434,7 @@ function renderGeoJSON(filteredData) {
         },
         mouseout: () => layer.closeTooltip(),
         click: e => {
-          layer.bindPopup(blockPopupHTML(bc), { maxWidth: 280 }).openPopup(e.latlng);
+          layer.bindPopup(blockPopupHTML(bc), { maxWidth: 480 }).openPopup(e.latlng);
         },
       });
     }
@@ -3398,7 +3482,7 @@ function flyToBlock(blockCode) {
     clearTimeout(flyTimeout);
     flyTimeout = setTimeout(() => {
       const center = bounds?.getCenter?.();
-      if (center) layer.bindPopup(blockPopupHTML(blockCode), { maxWidth: 280 }).openPopup(center);
+      if (center) layer.bindPopup(blockPopupHTML(blockCode), { maxWidth: 480 }).openPopup(center);
     }, 900);
   });
 }
