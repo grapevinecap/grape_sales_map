@@ -1069,7 +1069,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v73</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v74</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -3135,22 +3135,15 @@ function switchTab(tab) {
 
   if (tab === 'map') {
     setTimeout(() => {
-      const mapContainer = document.getElementById('map-container');
+      if (!mapInstance) initMap();
 
-      if (!mapInstance) {
-        // Pin container to top-left during init so getBoundingClientRect
-        // returns {left:0, top:0} — Leaflet then builds tile grid from origin.
-        // We correct the offset afterwards with invalidateSize + _resetView.
-        const origStyle = mapContainer.style.cssText;
-        mapContainer.style.cssText = 'position:fixed;top:0;left:0;width:' +
-          mapContainer.offsetWidth + 'px;height:' + mapContainer.offsetHeight + 'px;';
-        initMap();
-        mapContainer.style.cssText = origStyle;
-      }
-
-      // After restoring position, force Leaflet to re-read the real offset
+      // Force Leaflet to re-read the container's true screen position.
+      // invalidateSize alone doesn't update _pixelOrigin — we must call
+      // setView which triggers a full recalculation including container offset.
+      const center = mapInstance.getCenter();
+      const zoom   = mapInstance.getZoom();
       mapInstance.invalidateSize({ animate: false });
-      mapInstance._resetView(mapInstance.getCenter(), mapInstance.getZoom(), true);
+      mapInstance.setView(center, zoom, { animate: false, reset: true });
 
       updateMap();
       const bounds = mapInstance._grapeBounds;
