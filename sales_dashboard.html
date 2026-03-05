@@ -9,6 +9,7 @@
     https://cdnjs.cloudflare.com
     https://alcdn.msauth.net;
   worker-src blob:;
+  frame-src 'self' blob:;
   style-src 'self' 'unsafe-inline'
     https://fonts.googleapis.com;
   font-src https://fonts.gstatic.com;
@@ -1069,7 +1070,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v76</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v77</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -3327,8 +3328,12 @@ function initMap() {
     '<\/script></body></html>'
   ].join('\n');
 
-  const blob = new Blob([html], {type: 'text/html'});
-  frame.src = URL.createObjectURL(blob);
+  // Write content directly into the iframe document
+  frame.onload = null; // prevent recursion
+  const doc = frame.contentDocument || frame.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
   mapInstance = true;
 }
 
