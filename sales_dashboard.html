@@ -342,19 +342,7 @@ header {
   border-bottom-color: var(--wine);
 }
 #tab-dashboard { display: block; }
-#tab-map {
-  /* Use visibility+absolute instead of display:none so #map always
-     has dimensions — Leaflet needs a sized container to place tiles */
-  visibility: hidden;
-  position: absolute;
-  pointer-events: none;
-  width: 100%;
-}
-#tab-map.tab-visible {
-  visibility: visible;
-  position: relative;
-  pointer-events: auto;
-}
+#tab-map       { display: none; }
 
 /* ── MAP ── */
 #map-container {
@@ -3128,7 +3116,7 @@ let activeTab = 'dashboard';
 function switchTab(tab) {
   activeTab = tab;
   document.getElementById('tab-dashboard').style.display = tab === 'dashboard' ? 'block' : 'none';
-  document.getElementById('tab-map').classList.toggle('tab-visible', tab === 'map');
+  document.getElementById('tab-map').style.display       = tab === 'map'       ? 'block' : 'none';
   document.getElementById('tab-btn-dashboard').classList.toggle('active', tab === 'dashboard');
   document.getElementById('tab-btn-map').classList.toggle('active', tab === 'map');
 
@@ -3136,10 +3124,13 @@ function switchTab(tab) {
     if (!mapInstance) {
       initMap();
     }
-    // Invalidate multiple times to handle CSS transitions and reflows
-    setTimeout(() => mapInstance?.invalidateSize(), 0);
-    setTimeout(() => mapInstance?.invalidateSize(), 100);
-    setTimeout(() => { mapInstance?.invalidateSize(); updateMap(); }, 300);
+    // Single invalidateSize after browser has painted the now-visible container
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        mapInstance?.invalidateSize({ animate: false });
+        updateMap();
+      });
+    });
   }
 }
 
@@ -3272,6 +3263,14 @@ function blockPopupHTML(blockCode) {
 }
 
 function initMap() {
+  // Temporarily make container visible off-screen so Leaflet can measure it
+  const tabMap = document.getElementById('tab-map');
+  const wasHidden = tabMap.style.display === 'none' || getComputedStyle(tabMap).display === 'none';
+  if (wasHidden) {
+    tabMap.style.cssText = 'display:block;position:fixed;top:-9999px;left:-9999px;width:' +
+      document.getElementById('main-content').offsetWidth + 'px;height:520px;visibility:hidden;';
+  }
+
   mapInstance = L.map('map', { zoomControl: true, attributionControl: true });
   mapInstance.setView([38.5, -122.8], 10); // default: California wine country
 
@@ -3280,6 +3279,12 @@ function initMap() {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19, crossOrigin: true
   }).addTo(mapInstance);
+
+  // Restore hidden state — map is fully initialised now
+  if (wasHidden) {
+    tabMap.style.cssText = '';
+    tabMap.style.display = 'none';
+  }
 
   if (geojsonData) renderGeoJSON(getFilteredData());
 }
