@@ -20,8 +20,9 @@
     https://login.microsoft.com
     https://tile.openstreetmap.org
     https://*.tile.openstreetmap.org
-    https://*.basemaps.cartocdn.com;
-  img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.cartocdn.com;
+    https://*.basemaps.cartocdn.com
+    https://server.arcgisonline.com;
+  img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.cartocdn.com https://server.arcgisonline.com;
   frame-src https://login.microsoftonline.com;
   frame-ancestors 'none';
   base-uri 'none';
@@ -1038,6 +1039,29 @@ body.sidebar-open {
   border: none; border-radius: 3px;
   padding: 4px 8px;
 }
+/* Suppress Leaflet's blue focus outline on SVG polygon paths */
+.leaflet-container path.leaflet-interactive:focus,
+.leaflet-container path.leaflet-interactive:focus-visible {
+  outline: none !important;
+}
+/* Zoom to Full Extent button */
+.map-extent-btn {
+  position: relative;
+  height: 30px;
+  background: white;
+  border: 2px solid rgba(0,0,0,0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  display: flex; align-items: center; justify-content: center;
+  color: #333;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.15);
+  padding: 0 10px;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.map-extent-btn:hover { background: #f4f4f4; }
 </style>
 </head>
 <body>
@@ -1069,7 +1093,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v82</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v90</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -1391,6 +1415,10 @@ body.sidebar-open {
     <div id="tab-map">
       <div id="map-container">
         <div id="map"></div>
+        <div style="position:absolute;top:10px;right:10px;z-index:1000;display:flex;gap:6px;">
+          <button class="map-extent-btn" id="map-layer-btn" onclick="toggleMapLayer()" title="Switch base layer">Satellite</button>
+          <button class="map-extent-btn" onclick="zoomToFullExtent()" title="Reset Map">Reset Map</button>
+        </div>
         <div class="map-legend" id="map-legend"></div>
       </div>
     </div><!-- /#tab-map -->
@@ -3156,20 +3184,42 @@ function switchTab(tab) {
 // ═══════════════════════════════════════════════════════════
 let mapInstance    = null;   // Leaflet map
 let geojsonLayer   = null;   // current GeoJSON layer
+let selectedLayer  = null;   // currently highlighted polygon
 let geojsonData    = null;   // raw GeoJSON FeatureCollection
 let blockDataIndex = {};     // blockCode → spreadsheet row(s)
 
-// Colours matching STATUS_COLORS palette
-const MAP_STATUS_COLORS = {
-  'Sold':         { fill: '#3d5c38', border: '#2d4428' },
-  'Open':         { fill: '#b8881e', border: '#8a6616' },
-  'Custom Crush': { fill: '#4a7c9e', border: '#365c76' },
-  'Pending':      { fill: '#7e7060', border: '#5c5246' },
-  'Mothball':     { fill: '#6b1f2a', border: '#4a151d' },
-  'FFC':          { fill: '#8b5e3c', border: '#63432b' },
+// Varietal colors from QGIS QML style file
+const VARIETAL_COLORS = {
+  // White varietals added (not in QML)
+  'Aligote': '#e8e4c9',
+  'Assyrtiko': '#c8dfc1',
+  'Gruner Veltliner': '#d4e87a',
+  'Albarino': '#987db7', 'Arinto': '#987db7', 'Barbera': '#ec612a',
+  'Black Muscat': '#b7484b', 'Cabernet Franc': '#8d5a99',
+  'Cabernet Sauvignon': '#720206',
+  'Cabernet Sauvignon - Tier 2': '#720206',
+  'Cabernet Sauvignon - Tier 3': '#720206',
+  'Cabernet Sauvignon - Tier 4': '#720206', 'Carignan': '#91522d',
+  'Carignane': '#e77148', 'Carmenere': '#e480b4', 'Chardonnay': '#fda929',
+  'Chenin Blanc': '#e8718d', 'Cinsault': '#b7484b', 'Colombard': '#ff9e17',
+  'Fallow': '#65af89', 'Fiano': '#ff9e17', 'French Colombard': '#ff9e17',
+  'Gamay': '#e8718d', 'Graciano': '#b7484b', 'Grenache': '#937744',
+  'Grenache Blanc': '#d5c8bd', 'Lagrein': '#ff5abd', 'Lemons': '#ebeb00',
+  'Malbec': '#d27cf8', 'Malvasia': '#8d5a99', 'Marselan': '#e8718d',
+  'Merlot': '#f79898', 'Moschofilers': '#8d5a99', 'Mourvedre': '#d4c2a2',
+  "Nero d'Avola": '#f3a6b2', 'Petit Verdot': '#b2bcdf',
+  'Petite Sirah': '#f3a27e', 'Picpoul Blanc': '#f3a6b2',
+  'Pinot Blanc': '#e0dbd1', 'Pinot Gris': '#fed285', 'Pinot Noir': '#8316a6',
+  'Pinotage': '#a47158', 'Port': '#c43c39', 'Primitivo': '#987db7',
+  'Riesling': '#e77148', 'Rootstock': '#91522d', 'Roussanne': '#809db6',
+  'Sangiovese': '#deb2ca', 'Sauvignon Blanc': '#fffd42', 'Syrah': '#a61183',
+  'TBD': '#729b6f', 'Tannat': '#e77148', 'Tempranillo': '#e15989',
+  'Torrontes': '#7d8b8f', 'Touriga Nacional': '#beb297', 'Verdelho': '#becf50',
+  'Vermentino': '#987db7', 'Viognier': '#9896cf', 'Water Credits': '#5082ff',
+  'Zinfandel': '#7436e7',
 };
 const MAP_DEFAULT_COLOR  = { fill: '#aaaaaa', border: '#888888' };
-const MAP_FILTERED_ALPHA = 0.15; // opacity for blocks outside current filter
+const MAP_FILTERED_ALPHA = 0.15;
 
 async function fetchGeoJSON(token) {
   // Read GeoJSON from the 'GeoJSON' sheet in the same workbook, cell A1.
@@ -3236,14 +3286,36 @@ function buildBlockIndex(data) {
 }
 
 function getBlockStatus(blockCode) {
+  // Kept for legend/popup compatibility
   const rows = blockDataIndex[(blockCode || '').trim().toUpperCase()];
   if (!rows || rows.length === 0) return null;
-  // Prefer Sold > Pending > Custom Crush > Open
   const priority = ['Sold','Pending','Custom Crush','Open','Mothball','FFC'];
   for (const s of priority) {
     if (rows.some(r => r.status === s)) return s;
   }
   return rows[0].status;
+}
+
+function getBlockVarietal(blockCode) {
+  const rows = blockDataIndex[(blockCode || '').trim().toUpperCase()];
+  if (!rows || rows.length === 0) return null;
+  // Use first row's varietal (blocks are single-varietal in the shapefile)
+  return rows[0].varietal || null;
+}
+
+function getVarietalColor(varietal) {
+  if (!varietal) return MAP_DEFAULT_COLOR;
+  const hex = VARIETAL_COLORS[varietal] || VARIETAL_COLORS[varietal.trim()] || null;
+  if (!hex) return MAP_DEFAULT_COLOR;
+  // Darken by ~20% for border color
+  const darken = h => {
+    const n = parseInt(h.slice(1), 16);
+    const r = Math.max(0, (n >> 16) - 40);
+    const g = Math.max(0, ((n >> 8) & 0xff) - 40);
+    const b = Math.max(0, (n & 0xff) - 40);
+    return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+  };
+  return { fill: hex, border: darken(hex) };
 }
 
 function isBlockInFilter(blockCode, filteredData) {
@@ -3307,53 +3379,76 @@ function blockPopupHTML(blockCode) {
   }
 
   // ── CSS helpers ──────────────────────────────────────────────
-  const S = {
-    th:   'padding:4px 8px;text-align:right;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#7e7060;border-bottom:1px solid #e4dcc8;font-weight:400;white-space:nowrap;',
-    thL:  'padding:4px 8px 4px 0;text-align:left;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#7e7060;border-bottom:1px solid #e4dcc8;font-weight:400;',
-    td:   'padding:3px 8px;text-align:right;font-size:10px;white-space:nowrap;',
-    tdL:  'padding:3px 8px 3px 0;text-align:left;font-size:9px;color:#7e7060;white-space:nowrap;',
-    tdT:  'padding:3px 8px;text-align:right;font-size:10px;font-weight:500;white-space:nowrap;border-top:1px solid #e4dcc8;',
-    tdTL: 'padding:3px 8px 3px 0;text-align:left;font-size:9px;color:#7e7060;font-weight:500;white-space:nowrap;border-top:1px solid #e4dcc8;',
+  const PILL_STYLES = {
+    'Sold':         {bg:'#d1fae5', color:'#065f46'},
+    'Pending':      {bg:'#f3e8ff', color:'#6b21a8'},
+    'Open':         {bg:'#fef3c7', color:'#92400e'},
+    'Custom Crush': {bg:'#dbeafe', color:'#1e40af'},
+    'Mothball':     {bg:'#fee2e2', color:'#991b1b'},
+    'FFC':          {bg:'#fee2e2', color:'#991b1b'},
+  };
+  const pillBase = 'display:inline-block;padding:2px 7px;border-radius:20px;font-size:8px;letter-spacing:0.1em;text-transform:uppercase;font-weight:500;';
+  const makePill = (label, style) => {
+    const p = style || {bg:'#e5e7eb', color:'#374151'};
+    return `<span style="${pillBase}background:${p.bg};color:${p.color};">${esc(label)}</span>`;
+  };
+
+  // Row label cell: right-aligned, with colon
+  const labelCell = (txt, isTotal) =>
+    `<td style="padding:3px 4px 3px 0;text-align:right;font-size:9px;color:${isTotal?'#1c1712':'#7e7060'};white-space:nowrap;font-weight:${isTotal?'500':'400'};">${txt}:</td>`;
+
+  // Data cell: centered
+  const dataCell = (val, isTotal) =>
+    `<td style="padding:3px 8px;text-align:center;font-size:10px;white-space:nowrap;font-weight:${isTotal?'500':'400'};${isTotal?'border-top:1px solid #e4dcc8;':''};">${val}</td>`;
+
+  // Header cell: centered, with pill for status-type columns
+  const makeHeaderCell = (col, isTotal) => {
+    const pill = PILL_STYLES[col.label];
+    const content = pill
+      ? makePill(col.label, pill)
+      : `<span style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:${isTotal?'#1c1712':'#7e7060'};font-weight:${isTotal?'500':'400'};">${esc(col.label)}</span>`;
+    return `<th style="padding:4px 8px;text-align:center;border-bottom:1px solid #e4dcc8;font-weight:400;white-space:nowrap;">${content}</th>`;
   };
 
   const fmt0 = v => v > 0 ? fmtN(v) : '—';
   const fmtP = v => v > 0 ? '$' + fmtN(v) : '—';
-  const fmtT = v => v > 0 ? fmtN(v) : '—';
 
   // ── Build column header row ──────────────────────────────────
   const showTotal = cols.length > 1;
   const allCols   = showTotal ? [...cols, { label: 'Total', rows }] : cols;
 
-  let headerRow = `<tr><th style="${S.thL}"></th>`;
+  let headerRow = `<tr><th style="border-bottom:1px solid #e4dcc8;"></th>`;
   allCols.forEach((col, i) => {
     const isTotal = showTotal && i === allCols.length - 1;
-    headerRow += `<th style="${S.th}${isTotal ? 'color:#1c1712;font-weight:500;' : ''}">${esc(col.label)}</th>`;
+    headerRow += makeHeaderCell(col, isTotal);
   });
   headerRow += '</tr>';
 
   // ── Build data rows ──────────────────────────────────────────
   const metrics = [
-    { label: 'Acres',     fn: s => fmt0(s.acres) },
-    { label: 'Tons',      fn: s => fmt0(s.tons)  },
-    { label: 'T/Acre',    fn: s => s.tpa  > 0 ? s.tpa.toFixed(1)  : '—' },
-    { label: 'Revenue',   fn: s => s.rev  > 0 ? fmtK(s.rev) : '—' },
-    { label: '$/Ton',     fn: s => fmtP(s.ppt)   },
-    { label: 'Status',    fn: (s, col) => {
-        // Only show for Sold/Pending columns
+    { label: 'Acres',   fn: s => fmt0(s.acres) },
+    { label: 'Tons',    fn: s => fmt0(s.tons)  },
+    { label: 'T/Acre',  fn: s => s.tpa > 0 ? s.tpa.toFixed(1) : '—' },
+    { label: 'Revenue', fn: s => s.rev > 0 ? fmtK(s.rev) : '—' },
+    { label: '$/Ton',   fn: s => fmtP(s.ppt) },
+    { label: 'Status',  fn: (s, col) => {
         if (!col || col.label === 'Open' || col.label === 'Custom Crush' || col.label === 'Total') return '';
-        return s.statuses.join(', ') || '';
+        if (!s.statuses.length) return '';
+        return s.statuses.map(st => makePill(st, PILL_STYLES[st])).join(' ');
       }
     },
   ];
 
   let dataRows = '';
   metrics.forEach(m => {
-    dataRows += `<tr><td style="${S.tdL}">${m.label}</td>`;
+    const isTotal = false;
+    dataRows += '<tr>';
+    dataRows += labelCell(m.label, false);
     allCols.forEach((col, i) => {
-      const isTotal = showTotal && i === allCols.length - 1;
+      const isTotalCol = showTotal && i === allCols.length - 1;
       const s = colStats(col.rows);
       const val = m.fn(s, col);
-      dataRows += `<td style="${isTotal ? S.tdT : S.td}">${val}</td>`;
+      dataRows += dataCell(val, isTotalCol);
     });
     dataRows += '</tr>';
   });
@@ -3403,11 +3498,7 @@ function initMap() {
 
   mapInstance.setView([38.5, -122.8], 10);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
-    subdomains: 'abcd', maxZoom: 19,
-    tileSize: 512, zoomOffset: -1,
-  }).addTo(mapInstance);
+  initBaseLayers();
 
   if (geojsonData) renderGeoJSON(getFilteredData());
 }
@@ -3418,9 +3509,9 @@ function renderGeoJSON(filteredData) {
 
   geojsonLayer = L.geoJSON(geojsonData, {
     style: feature => {
-      const bc     = feature.properties[GEOJSON_BLOCK_FIELD] || '';
-      const status = getBlockStatus(bc);
-      const colors = status ? (MAP_STATUS_COLORS[status] || MAP_DEFAULT_COLOR) : MAP_DEFAULT_COLOR;
+      const bc       = feature.properties[GEOJSON_BLOCK_FIELD] || '';
+      const varietal = getBlockVarietal(bc);
+      const colors   = getVarietalColor(varietal);
       const inFilter = isBlockInFilter(bc, filteredData);
       return {
         fillColor:   colors.fill,
@@ -3440,18 +3531,24 @@ function renderGeoJSON(filteredData) {
         },
         mouseout: () => layer.closeTooltip(),
         click: e => {
-          layer.bindPopup(blockPopupHTML(bc), { maxWidth: 480 }).openPopup(e.latlng);
+          selectLayer(layer);
+          const popup = L.popup({ maxWidth: 480 })
+            .setContent(blockPopupHTML(bc))
+            .setLatLng(e.latlng);
+          popup.on('remove', () => {
+            if (selectedLayer === layer) clearSelection();
+          });
+          popup.openOn(mapInstance);
         },
       });
     }
   }).addTo(mapInstance);
 
-  if (!window._mapFitted) {
-    const bounds = geojsonLayer.getBounds();
-    if (bounds.isValid()) {
-      mapInstance._grapeBounds = bounds;
-      window._mapFitted = true;
-    }
+  // Store full extent bounds for fitBounds on tab switch and extent button
+  const fullBounds = geojsonLayer.getBounds();
+  if (fullBounds.isValid()) {
+    mapInstance._grapeBounds = fullBounds;
+    window._fullExtentBounds = fullBounds;
   }
   buildMapLegend(filteredData);
 }
@@ -3459,13 +3556,15 @@ function renderGeoJSON(filteredData) {
 function buildMapLegend(filteredData) {
   const el = document.getElementById('map-legend');
   if (!el) return;
-  // Only show statuses actually present in filtered data
-  const statuses = [...new Set(filteredData.map(d => d.status))];
-  el.innerHTML = statuses.map(s => {
-    const col = MAP_STATUS_COLORS[s] || MAP_DEFAULT_COLOR;
+  // Show varietals present in filtered data, sorted alphabetically
+  // Collapse tier variants into their base varietal for legend display
+  const normVarietal = v => v.replace(/\s*-\s*Tier\s*\d+$/i, '').trim();
+  const varietals = [...new Set(filteredData.map(d => d.varietal).filter(Boolean).map(normVarietal))].sort();
+  el.innerHTML = varietals.map(v => {
+    const col = getVarietalColor(v);
     return `<div class="map-legend-item">
       <div class="map-legend-swatch" style="background:${col.fill};border:1px solid ${col.border};"></div>
-      <span>${esc(s)}</span>
+      <span>${esc(v)}</span>
     </div>`;
   }).join('');
 }
@@ -3473,6 +3572,65 @@ function buildMapLegend(filteredData) {
 function updateMap() {
   if (!mapInstance || !geojsonData) return;
   renderGeoJSON(getFilteredData());
+}
+
+// ── Base layer toggle ─────────────────────────────────────────
+let baseLayer     = null;
+let satelliteLayer = null;
+let isSatellite   = false;
+
+const CARTO_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+const CARTO_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>';
+const ESRI_URL  = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const ESRI_ATTR = 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
+
+function initBaseLayers() {
+  baseLayer      = L.tileLayer(CARTO_URL, { attribution: CARTO_ATTR, subdomains: 'abcd', maxZoom: 19 });
+  satelliteLayer = L.tileLayer(ESRI_URL,  { attribution: ESRI_ATTR, maxZoom: 19 });
+  baseLayer.addTo(mapInstance);
+}
+
+function toggleMapLayer() {
+  if (!mapInstance) return;
+  const btn = document.getElementById('map-layer-btn');
+  if (isSatellite) {
+    mapInstance.removeLayer(satelliteLayer);
+    baseLayer.addTo(mapInstance);
+    if (btn) btn.textContent = 'Satellite';
+    isSatellite = false;
+  } else {
+    mapInstance.removeLayer(baseLayer);
+    satelliteLayer.addTo(mapInstance);
+    if (btn) btn.textContent = 'Street Map';
+    isSatellite = true;
+  }
+  // Bring polygons back to front after layer switch
+  if (geojsonLayer) geojsonLayer.bringToFront();
+}
+
+function selectLayer(layer) {
+  // Reset previous selection
+  if (selectedLayer && selectedLayer !== layer) {
+    clearSelection();
+  }
+  selectedLayer = layer;
+  if (layer) {
+    layer.setStyle({ color: '#00c853', weight: 3, opacity: 1 });
+    layer.bringToFront();
+  }
+}
+
+function clearSelection() {
+  if (selectedLayer && geojsonLayer) {
+    geojsonLayer.resetStyle(selectedLayer);
+    selectedLayer = null;
+  }
+}
+
+function zoomToFullExtent() {
+  if (!mapInstance) return;
+  const bounds = window._fullExtentBounds || geojsonLayer?.getBounds();
+  if (bounds?.isValid()) mapInstance.fitBounds(bounds, { padding: [20, 20], animate: true });
 }
 
 let flyTimeout = null;
@@ -3488,7 +3646,16 @@ function flyToBlock(blockCode) {
     clearTimeout(flyTimeout);
     flyTimeout = setTimeout(() => {
       const center = bounds?.getCenter?.();
-      if (center) layer.bindPopup(blockPopupHTML(blockCode), { maxWidth: 480 }).openPopup(center);
+      if (center) {
+        selectLayer(layer);
+        const popup = L.popup({ maxWidth: 480 })
+          .setContent(blockPopupHTML(blockCode))
+          .setLatLng(center);
+        popup.on('remove', () => {
+          if (selectedLayer === layer) clearSelection();
+        });
+        popup.openOn(mapInstance);
+      }
     }, 900);
   });
 }
