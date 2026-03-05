@@ -3166,7 +3166,22 @@ async function fetchGeoJSON(token) {
   try {
     return JSON.parse(raw);
   } catch(e) {
-    throw new Error('GeoJSON sheet A1 is not valid JSON: ' + e.message);
+    // Excel commonly replaces straight quotes with curly/smart quotes.
+    // Normalize them back before retrying.
+    const cleaned = raw
+      .replace(/[“”„‟″‶]/g, '"') // curly double quotes → "
+      .replace(/[‘’‚‛′‵]/g, "'") // curly single quotes → '
+      .replace(/–|—/g, '-')   // em/en dash → hyphen
+      .replace(/
+|/g, '
+');       // normalize line endings
+    try {
+      return JSON.parse(cleaned);
+    } catch(e2) {
+      // Show the first 60 chars of raw so we can see what Excel returned
+      throw new Error('GeoJSON sheet A1 is not valid JSON: ' + e2.message +
+        ' | Raw start: ' + JSON.stringify(raw.slice(0, 60)));
+    }
   }
 }
 
