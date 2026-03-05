@@ -1,0 +1,3408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self' 'unsafe-inline'
+    https://cdnjs.cloudflare.com
+    https://alcdn.msauth.net;
+  worker-src blob:;
+  style-src 'self' 'unsafe-inline'
+    https://fonts.googleapis.com;
+  font-src https://fonts.gstatic.com;
+  connect-src
+    https://graph.microsoft.com
+    https://login.microsoftonline.com
+    https://login.microsoft.com
+    https://*.tile.openstreetmap.org
+    https://*.basemaps.cartocdn.com;
+  img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com;
+  frame-src https://login.microsoftonline.com;
+  frame-ancestors 'none';
+  base-uri 'none';
+  form-action 'none';
+">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta name="referrer" content="no-referrer">
+<title>Kylix Vineyards — 2026 Grape Sales Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous"></script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<style>
+:root {
+  --ink: #1c1712;
+  --cream: #f6f1e9;
+  --parchment: #ede6d4;
+  --parchment2: #e4dcc8;
+  --wine: #6b1f2a;
+  --wine-light: #9e3545;
+  --wine-muted: #b06070;
+  --gold: #b8881e;
+  --gold-light: #d9aa4a;
+  --gold-pale: #f0dfa0;
+  --sage: #3d5c38;
+  --sage-light: #6a8f62;
+  --dust: #7e7060;
+  --border: rgba(28,23,18,0.1);
+  --shadow-sm: 0 1px 8px rgba(28,23,18,0.07);
+  --shadow-md: 0 3px 20px rgba(28,23,18,0.1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; overflow: hidden; }
+body { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+
+body {
+  font-family: 'DM Mono', monospace;
+  background: var(--cream);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ── LOADING OVERLAY ── */
+#loading-overlay {
+  position: fixed; inset: 0;
+  background: var(--ink);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.5s ease;
+}
+#loading-overlay.fade-out { opacity: 0; pointer-events: none; }
+.loading-logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 42px; font-weight: 300;
+  color: var(--cream); letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.loading-sub {
+  font-size: 10px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--gold-light);
+  margin-bottom: 48px;
+}
+.loading-dot-wrap {
+  display: flex; gap: 7px; align-items: center;
+  height: 12px;
+}
+.loading-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--gold-light);
+  opacity: 0.25;
+  animation: dotpulse 1.4s ease-in-out infinite;
+  transition: background 0.4s ease, opacity 0.4s ease, transform 0.4s ease;
+}
+.loading-dot:nth-child(2) { animation-delay: 0.2s; }
+.loading-dot:nth-child(3) { animation-delay: 0.4s; }
+.loading-dot:nth-child(4) { animation-delay: 0.6s; }
+.loading-dot:nth-child(5) { animation-delay: 0.8s; }
+.loading-dot.done {
+  background: var(--sage-light);
+  opacity: 1;
+  animation: none;
+  transform: scale(1.2);
+}
+@keyframes dotpulse {
+  0%, 100% { opacity: 0.2; transform: scaleY(1); }
+  50%       { opacity: 1;   transform: scaleY(1.6); }
+}
+.loading-status {
+  margin-top: 16px; font-size: 10px;
+  color: rgba(255,255,255,0.4); letter-spacing: 0.1em;
+}
+.loading-error {
+  color: #f87171; font-size: 11px; margin-top: 20px;
+  max-width: 360px; text-align: center; line-height: 1.6;
+  display: none;
+}
+
+/* ── HEADER ── */
+header {
+  background: var(--ink);
+  padding: 22px 36px 18px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  border-bottom: 3px solid var(--wine);
+  position: sticky; top: 0; z-index: 100;
+}
+.header-left h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 28px; font-weight: 300;
+  color: var(--cream); letter-spacing: 0.04em; line-height: 1;
+}
+.header-left .subtitle {
+  font-size: 9px; color: var(--gold-light);
+  letter-spacing: 0.22em; text-transform: uppercase; margin-top: 5px;
+}
+.header-right { text-align: right; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.live-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 20px; padding: 4px 10px;
+  font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 0.1em;
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #4ade80; animation: blink 2.2s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.sync-time { font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 0.08em; }
+.refresh-btn {
+  background: none; border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.5); font-family: 'DM Mono', monospace;
+  font-size: 9px; letter-spacing: 0.1em; padding: 4px 10px;
+  border-radius: 3px; cursor: pointer; transition: all 0.2s;
+  position: relative;
+}
+.refresh-btn:hover:not(:disabled) { border-color: var(--gold-light); color: var(--gold-light); }
+.refresh-btn:disabled { cursor: default; opacity: 0.6; }
+.refresh-btn.refreshing { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.6); }
+.refresh-btn.refreshing .refresh-icon { display: inline-block; animation: spin 0.8s linear infinite; }
+.refresh-btn.refresh-ok { border-color: #4ade80; color: #4ade80; }
+.refresh-btn.refresh-err { border-color: #f87171; color: #f87171; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.refresh-icon { display: inline-block; }
+
+/* ── LAYOUT ── */
+.app-body { display: grid; grid-template-columns: 252px 1fr; grid-template-rows: 1fr; align-items: stretch; flex: 1; min-height: 0; overflow: hidden; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  background: var(--parchment);
+  border-right: 1px solid var(--border);
+  padding: 20px 16px;
+  overflow-y: hidden;
+  height: 100%;
+  display: flex; flex-direction: column;
+}
+.sidebar-head {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 14px; font-weight: 500; color: var(--wine);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px; margin-bottom: 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.filter-count {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px; background: var(--wine);
+  color: white; padding: 2px 7px; border-radius: 10px;
+}
+/* ── SUB-FILTER COLLAPSIBLES ── */
+.sf-head {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; user-select: none;
+  padding: 5px 0 5px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+  background: var(--parchment);
+}
+/* Only the currently open sub-filter head sticks to the top */
+.sf-head.sf-head-open {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--parchment);
+}
+.sf-head:hover .sf-label { color: var(--wine); }
+.sf-label {
+  font-size: 9px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--dust);
+  transition: color 0.15s;
+}
+.sf-arrow {
+  font-size: 8px; color: var(--dust);
+  transition: transform 0.18s; display: inline-block;
+}
+.sf-arrow.open { transform: rotate(180deg); }
+/* ── MOBILE FILTER CHECKBOX LIST ── */
+/* On touch devices, replace <select multiple> with a checkbox list */
+.sf-checklist {
+  display: none; /* hidden on desktop */
+  flex-direction: column;
+  gap: 0;
+  padding: 4px 0;
+}
+.sf-checklist label {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 8px;
+  font-family: 'DM Mono', monospace; font-size: 11px;
+  color: var(--ink); cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  min-height: 44px;
+  user-select: none;
+}
+.sf-checklist label:last-child { border-bottom: none; }
+.sf-checklist input[type="checkbox"] {
+  width: 18px; height: 18px; flex-shrink: 0;
+  accent-color: var(--wine); cursor: pointer;
+}
+.sf-checklist label.all-option {
+  color: var(--dust); font-style: italic;
+}
+@media (hover: none) and (pointer: coarse) {
+  .sf-body select[multiple] { display: none; }
+  .sf-checklist { display: flex; }
+}
+
+.sf-body {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+  flex-shrink: 0; /* collapsed: takes no space */
+}
+.sf-body.open {
+  max-height: 2000px; /* JS sets actual height on the <select> directly */
+  opacity: 1;
+  overflow: hidden;   /* clip to select height, never let it push siblings */
+  flex-shrink: 0;     /* don't compress — select height is already computed */
+}
+.sf-body select[multiple] {
+  width: 100%; background: var(--cream);
+  border: 1px solid var(--border); border-top: none; color: var(--ink);
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  padding: 3px; cursor: pointer;
+  border-radius: 0 0 3px 3px;
+  /* Height set by JS to fit options or available space */
+  min-height: 36px;
+  display: block;
+}
+.sf-body select[multiple]:focus { outline: none; border-color: var(--wine); }
+.sf-body select[multiple] option { padding: 3px 5px; border-radius: 2px; font-size: 10px; }
+.sf-body select[multiple] option:checked { background: var(--wine); color: white; }
+
+/* keep .fg working for any remaining non-sub-filter use */
+.fg { margin-bottom: 14px; }
+.fg label {
+  display: block; font-size: 9px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--dust); margin-bottom: 5px;
+}
+.fg select {
+  width: 100%; background: var(--cream);
+  border: 1px solid var(--border); color: var(--ink);
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  padding: 6px 8px; border-radius: 3px; appearance: none; cursor: pointer;
+  transition: border-color 0.15s;
+}
+.fg select:focus { outline: none; border-color: var(--wine); }
+.fg select[multiple] { height: 72px; padding: 3px; }
+.fg select[multiple] option { padding: 3px 5px; border-radius: 2px; font-size: 10px; }
+.fg select[multiple] option:checked { background: var(--wine); color: white; }
+.range-wrap input[type=range] {
+  width: 100%; accent-color: var(--wine); cursor: pointer;
+}
+.range-labels { display: flex; justify-content: space-between; font-size: 9px; color: var(--dust); margin-top: 3px; }
+.range-labels span.mid { color: var(--wine); font-weight: 500; }
+.reset-btn {
+  width: 100%; margin-top: 10px; padding: 8px;
+  background: var(--wine); color: var(--cream); border: none;
+  font-family: 'DM Mono', monospace; font-size: 9px;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  cursor: pointer; border-radius: 3px; transition: background 0.2s;
+}
+.reset-btn:hover { background: var(--wine-light); }
+
+/* ── MAIN CONTENT ── */
+/* Right column: flex column so footer pins to bottom */
+.main-col {
+  display: flex; flex-direction: column;
+  min-height: 0;   /* allows flex children to scroll within grid cell */
+  min-width: 0;
+}
+.content {
+  padding: 24px 28px;
+  overflow-y: auto;   /* only the content area scrolls */
+  flex: 1;            /* grows to fill space above footer */
+  min-height: 0;      /* required for flex overflow to work */
+}
+
+/* ── TAB SWITCHER ── */
+.view-tabs {
+  display: flex; gap: 0;
+  margin-bottom: 18px;
+  border-bottom: 2px solid var(--border);
+}
+.view-tab {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+  padding: 8px 18px; cursor: pointer;
+  border: none; background: none;
+  color: var(--dust); border-bottom: 2px solid transparent;
+  margin-bottom: -2px; transition: all 0.15s;
+}
+.view-tab:hover { color: var(--wine); }
+.view-tab.active {
+  color: var(--wine); font-weight: 600;
+  border-bottom-color: var(--wine);
+}
+#tab-dashboard { display: block; }
+#tab-map       { display: none;  }
+
+/* ── MAP ── */
+#map-container {
+  height: 520px;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+#map { height: 100%; width: 100%; }
+.map-legend {
+  position: absolute; bottom: 24px; right: 8px;
+  z-index: 1000;
+  background: white; border: 1px solid var(--border);
+  border-radius: 3px; padding: 8px 10px;
+  font-family: 'DM Mono', monospace;
+  font-size: 8px; letter-spacing: 0.08em;
+  box-shadow: var(--shadow-sm);
+}
+.map-legend-item {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+}
+.map-legend-item:last-child { margin-bottom: 0; }
+.map-legend-swatch {
+  width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0;
+}
+/* Highlight pulse on table-row click */
+@keyframes map-pulse {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+.map-pulse { animation: map-pulse 0.5s ease 3; }
+
+/* Mobile: shorter map */
+@media (max-width: 768px) {
+  #map-container { height: 360px; }
+  .view-tab { padding: 10px 14px; font-size: 10px; }
+}
+
+/* ── KPI ROW ── */
+.kpi-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  grid-auto-rows: 130px;
+  gap: 12px; margin-bottom: 22px;
+  /* Don't let text content blow out grid columns */
+  width: 100%;
+  min-width: 0;
+}
+/* Each KPI cell must not exceed its 1fr column */
+.kpi-grid > .kpi {
+  min-width: 0;
+  overflow: hidden;
+}
+.kpi {
+  background: white; border: 1px solid var(--border);
+  border-top: 3px solid var(--wine); border-radius: 3px;
+  padding: 14px 16px; box-shadow: var(--shadow-sm);
+  transition: transform 0.15s, box-shadow 0.15s;
+  display: flex; flex-direction: column;
+  min-height: 130px;
+}
+.kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.kpi.k-gold { border-top-color: var(--gold); }
+.kpi.k-sage { border-top-color: var(--sage); }
+.kpi.k-dust { border-top-color: var(--dust); }
+.kpi.k-wine2 { border-top-color: var(--wine-muted); }
+.kpi-lbl { font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dust); margin-bottom: 4px; flex-shrink: 0; transition: font-size 0.1s; }
+.kpi-val { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 500; color: var(--ink); line-height: 1; transition: font-size 0.15s; }
+.kpi-sub { font-size: 9px; color: var(--dust); margin-top: 5px; }
+.kpi-body {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 6px;
+  flex: 1; min-height: 0;
+}
+/* Left: big number — fixed basis so it never crowds the breakdown */
+.kpi-body > .kpi-val {
+  align-self: flex-start;
+  flex: 0 1 auto;   /* don't grow; can shrink if needed */
+  min-width: 0;
+  max-width: 52%;   /* never take more than half the row */
+  line-height: 1.05;
+}
+.kpi-breakdown {
+  display: grid;
+  grid-template-columns: 1fr auto;  /* label fills left; value column auto-sizes right */
+  align-content: space-between;
+  align-items: center;
+  flex: 1 1 0;
+  align-self: stretch;
+  min-width: 0; overflow: hidden;
+  gap: 0 5px;
+}
+.bline-label {
+  color: var(--dust); opacity: 0.7;
+  font-family: 'DM Mono', monospace; letter-spacing: 0.04em;
+  font-size: 7.5px; /* overridden by JS scaleKpiText() */
+  white-space: nowrap; overflow: hidden;
+  text-align: right;
+  display: block; width: 100%;    /* fill the 1fr column so right-align works */
+  transition: font-size 0.15s;
+}
+.bline-val {
+  color: var(--dust); white-space: nowrap;
+  font-family: 'DM Mono', monospace; letter-spacing: 0.04em;
+  font-size: 7.5px; /* overridden by JS scaleKpiText() */
+  text-align: right;
+  display: block;
+  transition: font-size 0.15s;
+}
+
+/* ── SECTION GRID ── */
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+.row1 { margin-bottom: 18px; }
+
+/* ── DRAGGABLE CHART GRID ── */
+#chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+#chart-grid .chart-slot {
+  min-width: 0; /* prevent grid blowout */
+}
+#chart-grid .chart-slot.slot-wide {
+  grid-column: span 2;
+}
+#chart-grid .chart-slot.slot-hidden {
+  display: none;
+}
+
+/* ── UNIFORM CARD HEIGHT ── */
+/* Every chart card is the same total height */
+.chart-slot .card {
+  cursor: grab; user-select: none;
+  transition: box-shadow 0.15s, opacity 0.15s;
+  height: 360px;        /* total card height = header + body */
+  display: flex;
+  flex-direction: column;
+}
+/* Touch devices: remove grab cursor and selection block so taps register normally */
+@media (hover: none) and (pointer: coarse) {
+  .chart-slot .card { cursor: default; user-select: auto; }
+  .chart-slot .card:active { cursor: default; }
+  .drag-handle { display: none; } /* hide drag handle on touch — not usable */
+}
+.chart-slot .card .card-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Chart canvases fill available card body */
+.chart-slot .card .card-body > div[class^="chart-"],
+.chart-slot .card .card-body > div[class*=" chart-"] {
+  flex: 1; height: 100% !important; position: relative;
+}
+/* Progress/revenue lists fill card body and scroll */
+.chart-slot .card .card-body .prog-list,
+.chart-slot .card .card-body .rev-list {
+  flex: 1; max-height: none; overflow-y: auto;
+}
+
+.chart-slot .card:active { cursor: grabbing; }
+.chart-slot.dragging { opacity: 0.4; }
+.chart-slot.drag-over .card {
+  box-shadow: 0 0 0 2px var(--wine), var(--shadow-md);
+}
+/* drag handle in card-head */
+.drag-handle {
+  color: var(--border); font-size: 14px; cursor: grab;
+  padding: 0 6px 0 0; line-height: 1;
+  transition: color 0.15s;
+}
+.drag-handle:hover { color: var(--dust); }
+
+/* ── COLLAPSIBLE SIDEBAR SECTIONS ── */
+.collapsible-head {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; user-select: none;
+  flex-shrink: 0;
+}
+.collapsible-head:hover .collapse-arrow { color: var(--wine); }
+.collapse-arrow {
+  font-size: 10px; color: var(--dust);
+  transition: transform 0.2s; display: inline-block;
+}
+.collapse-arrow.open { transform: rotate(180deg); }
+
+/* Default: all collapsible bodies closed */
+.collapsible-body {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  flex-shrink: 0;
+  transition: max-height 0.3s ease, opacity 0.2s ease;
+}
+/* Widgets section: fixed cap (5 buttons) */
+#section-widgets.open {
+  max-height: 200px;           /* 5 buttons at ~32px + spacing */
+  opacity: 1;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+/* Charts section: fixed max-height cap so filters can use remaining space */
+#section-charts.open {
+  max-height: 260px;           /* 7 buttons at ~32px + spacing */
+  opacity: 1;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+/* Filters section: grows to fill all remaining sidebar height */
+#section-filters.open {
+  flex: 1;
+  max-height: none !important; /* override .collapsible-body */
+  opacity: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* ── SIDEBAR CHART VISIBILITY ── */
+.sidebar-section-head {
+  font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--dust); font-weight: 600;
+  margin: 0; padding: 5px 0;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.vis-btn {
+  display: flex; align-items: center; gap: 7px;
+  width: 100%; background: var(--cream);
+  border: 1px solid var(--border); color: var(--ink);
+  font-family: 'DM Mono', monospace; font-size: 9px;
+  padding: 5px 9px; border-radius: 3px; cursor: pointer;
+  margin-bottom: 5px; text-align: left;
+  transition: all 0.15s;
+}
+.vis-btn:hover { border-color: var(--wine-muted); color: var(--wine); }
+.vis-btn.hidden-chart {
+  background: var(--parchment2); color: var(--dust);
+  text-decoration: line-through; border-style: dashed;
+}
+.vis-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--sage); flex-shrink: 0; transition: background 0.15s;
+}
+.vis-btn.hidden-chart .vis-dot { background: var(--border); }
+
+.card {
+  background: white; border: 1px solid var(--border);
+  border-radius: 3px; box-shadow: var(--shadow-sm); overflow: hidden;
+}
+.card-head {
+  padding: 10px 14px 8px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.card-head .card-title { flex: 1; min-width: 0; }
+.card-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 14px; font-weight: 500; color: var(--ink); letter-spacing: 0.02em;
+}
+.card-badge {
+  font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--dust); background: var(--parchment);
+  padding: 3px 8px; border-radius: 20px;
+}
+.card-body { padding: 14px 16px; }
+.chart-h200 { position: relative; height: 200px; }
+.chart-h260 { position: relative; height: 260px; }
+.chart-h300 { position: relative; height: 300px; }
+
+/* ── PROGRESS BARS ── */
+.prog-list { display: flex; flex-direction: column; gap: 9px; max-height: 320px; overflow-y: auto; padding-right: 14px; }
+.prog-item {}
+.prog-meta { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.prog-name { font-size: 10px; color: var(--ink); }
+.prog-stat { font-size: 9px; color: var(--dust); }
+.prog-bg { height: 5px; background: var(--parchment); border-radius: 3px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 3px; background: rgb(107,31,42); transition: width 0.5s ease; }
+
+/* ── TABLE ── */
+.tbl-wrap { overflow-x: auto; max-height: 400px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 10px; }
+thead th {
+  background: var(--ink); color: var(--cream);
+  padding: 8px 10px; text-align: left;
+  font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 400;
+  position: sticky; top: 0; cursor: pointer; white-space: nowrap; user-select: none;
+}
+thead th:hover { background: var(--wine); }
+thead th.asc::after { content: ' ↑'; color: var(--gold-light); }
+thead th.desc::after { content: ' ↓'; color: var(--gold-light); }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+tbody tr:hover { background: var(--parchment); }
+tbody tr.tbl-row { cursor: pointer; }
+tbody td { padding: 7px 10px; white-space: nowrap; }
+td.r { text-align: right; font-variant-numeric: tabular-nums; }
+.chart-h-ava  { position: relative; height: 200px; }
+.chart-h-ppt  { position: relative; height: 300px; }
+
+.pill {
+  display: inline-block; padding: 2px 7px; border-radius: 20px;
+  font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500;
+}
+.p-sold { background: #d1fae5; color: #065f46; }
+.p-open { background: #fef3c7; color: #92400e; }
+.p-cc { background: #dbeafe; color: #1e40af; }
+.p-pending { background: #f3e8ff; color: #6b21a8; }
+.p-mothball { background: #fee2e2; color: #991b1b; }
+
+/* ── TOGGLE BUTTONS ── */
+.toggle-wrap {
+  display: flex; gap: 4px;
+}
+.tog {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--parchment); color: var(--dust);
+  cursor: pointer; transition: all 0.15s;
+}
+.tog.active {
+  background: var(--wine); color: var(--cream); border-color: var(--wine);
+}
+.tog:hover:not(.active) { border-color: var(--wine-muted); color: var(--wine); }
+/* Vertical separator between toggle button groups */
+.tog-sep {
+  width: 1px; background: var(--border);
+  align-self: stretch; margin: 2px 3px; flex-shrink: 0;
+}
+
+/* ── STANDARD CHART HEIGHT (all charts use this) ── */
+.chart-std { position: relative; height: 240px; }
+
+/* ── SCROLLABLE REVENUE LIST (like % Sold) ── */
+.rev-list {
+  display: flex; flex-direction: column; gap: 9px;
+  max-height: 260px; overflow-y: auto;
+  padding-right: 14px;
+}
+.rev-item {}
+.rev-meta { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.rev-name { font-size: 10px; color: var(--ink); }
+.rev-stat { font-size: 9px; color: var(--dust); }
+.rev-bg { height: 5px; background: var(--parchment); border-radius: 3px; overflow: hidden; }
+.rev-fill { height: 100%; border-radius: 3px;
+  background: rgb(107,31,42);
+  transition: width 0.5s ease; }
+
+/* ── FOOTER ── */
+footer {
+  background: var(--parchment2); border-top: 1px solid var(--border);
+  padding: 10px 28px; display: flex; justify-content: space-between;
+  font-size: 9px; color: var(--dust);
+  flex-shrink: 0; /* never compress — always visible at bottom of main-col */
+}
+.footer-count { color: var(--wine); font-weight: 500; }
+
+/* ════════════════════════════════════════════════════
+   HAMBURGER BUTTON (hidden on desktop)
+════════════════════════════════════════════════════ */
+.hamburger {
+  display: none;
+  flex-direction: column; justify-content: center; align-items: center;
+  gap: 5px; width: 36px; height: 36px;
+  background: none; border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px; cursor: pointer; flex-shrink: 0;
+  padding: 0;
+}
+.hamburger span {
+  display: block; width: 18px; height: 2px;
+  background: rgba(255,255,255,0.7); border-radius: 2px;
+  transition: all 0.25s;
+}
+/* Animate hamburger → X when sidebar open */
+.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Hamburger inside sidebar-head — hidden on desktop, visible on mobile */
+.hamburger-fixed {
+  display: none;
+  background: none;
+  border: 1px solid rgba(28,23,18,0.2);
+}
+.hamburger-fixed span {
+  background: var(--wine);
+}
+
+/* Fixed open button — always visible at top-left on mobile */
+.mob-open-btn {
+  display: none; /* hidden on desktop */
+  position: fixed;
+  top: 10px; left: 10px;
+  z-index: 101; /* above sticky header (z-index:100) */
+  width: 36px; height: 36px;
+  flex-direction: column; justify-content: center; align-items: center;
+  gap: 5px; padding: 0;
+  background: var(--ink);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.mob-open-btn span {
+  display: block; width: 18px; height: 2px;
+  background: rgba(255,255,255,0.75); border-radius: 2px;
+  transition: all 0.25s;
+}
+/* Hide when sidebar is open (sidebar's own X button takes over) */
+.mob-open-btn.open { display: none !important; }
+
+/* ════════════════════════════════════════════════════
+   SIDEBAR BACKDROP (mobile only)
+════════════════════════════════════════════════════ */
+/* Body scroll lock when sidebar open — iOS respects touch-action */
+body.sidebar-open {
+  overflow: hidden;
+  touch-action: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(28,23,18,0.55);
+  z-index: 149;
+  opacity: 0;
+  pointer-events: none;
+  touch-action: none;     /* block touch scroll on backdrop */
+  transition: opacity 0.25s;
+}
+.sidebar-backdrop.visible {
+  display: block;
+  opacity: 1;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* ════════════════════════════════════════════════════
+   BREAKPOINT: TABLET  ≤ 1024px
+   Slightly narrower sidebar, tighter padding
+════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .app-body { grid-template-columns: 220px 1fr; }
+  .content { padding: 18px 20px; }
+  .kpi-grid { grid-auto-rows: 110px; }
+  .kpi { min-height: 110px; padding: 10px 12px; }
+  .chart-slot .card { height: 320px; }
+}
+
+/* ════════════════════════════════════════════════════
+   BREAKPOINT: MOBILE  ≤ 768px
+   Sidebar becomes a slide-in drawer from the left.
+   Charts go single-column. KPIs stack 2×3 then 1×5.
+════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* Restore normal document scroll on mobile — sidebar is a drawer, not a column */
+  html, body { overflow: auto; height: auto; display: block; }
+  .app-body { display: block; flex: none; height: auto; overflow: visible; }
+  .main-col { height: auto; overflow: visible; }
+  .content { overflow-y: visible; flex: none; }
+  /* footer mobile styles handled in block above */
+
+  /* Header: show hamburger, compress layout — sticky so it never scrolls away */
+  header {
+    padding: 14px 16px 12px;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 99;
+  }
+  .header-left {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .hamburger { display: flex; }
+  .hamburger-fixed { display: flex; } /* close button inside sidebar */
+  #hamburger-btn { display: none; }   /* hide header btn — mob-open-btn used instead */
+  .mob-open-btn { display: flex; }    /* fixed open button always visible */
+  /* Pad header left so title doesn't sit under the fixed button */
+  .header-left { padding-left: 48px; }
+  .header-left h1 { font-size: 18px; }
+  .header-left .subtitle { font-size: 8px; margin-top: 3px; }
+  .live-badge { display: none; } /* hide on mobile — saves space */
+  .sync-time { font-size: 8px; }
+
+  /* App body: remove grid, sidebar goes out-of-flow */
+  .app-body { display: block; }
+
+  /* Sidebar: fixed drawer, slides in from left */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 280px;
+    height: 100dvh;
+    z-index: 150;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: none;
+    /* Override sticky positioning */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
+    overscroll-behavior: contain;      /* prevent scroll chaining to body */
+    padding-top: 24px;
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(28,23,18,0.25);
+  }
+  /* sidebar-backdrop visibility is controlled by JS, not media query */
+
+  /* Main content: full width */
+  .content {
+    padding: 16px 14px;
+    overflow-y: visible;
+    /* Reserve no space for sidebar */
+    width: 100%;
+  }
+
+  /* KPIs: 2 per row on mobile */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: 100px;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .kpi { min-height: 100px; padding: 10px 12px; }
+
+  /* Charts: single column */
+  #chart-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  #chart-grid .chart-slot.slot-wide {
+    grid-column: span 1; /* wide cards revert to full width */
+  }
+  .chart-slot .card { height: 300px; }
+
+  /* Table: horizontal scroll */
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { min-width: 700px; }
+
+  /* Row grids: single column */
+  .row2, .row3 { grid-template-columns: 1fr; gap: 14px; }
+
+  /* Footer: stack vertically */
+  /* footer mobile styles handled in block above */
+}
+
+/* ════════════════════════════════════════════════════
+   MOBILE SIDEBAR: larger touch targets for tappable items
+════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Match section head height to sf-head touch target */
+  .sidebar-section-head {
+    margin: 0;
+    padding: 13px 0;
+  }
+  /* When filters is open, hide the entire Widgets and Charts groups */
+  .sidebar.filters-open #section-group-widgets,
+  .sidebar.filters-open #section-group-charts {
+    display: none;
+  }
+  /* Remove the Filters section-head top border/margin when it's the first item */
+  .sidebar.filters-open [onclick="toggleSection('filters')"] {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 0;
+  }
+
+  /* Filter sub-headers (Owner, Status, AVA, etc.) */
+  .sf-head {
+    padding: 13px 0;
+    min-height: 44px;
+  }
+  .sf-head.sf-head-open {
+    background: var(--parchment);
+  }
+
+  /* Widget + Chart toggle buttons */
+  .vis-btn {
+    padding: 11px 12px;
+    font-size: 11px;
+    margin-bottom: 7px;
+    min-height: 44px;
+  }
+
+  /* Widgets / Charts / Filters section headers */
+  .collapsible-head {
+    min-height: 44px;
+    padding: 0;  /* padding comes from sidebar-section-head */
+  }
+  .sidebar-section-head {
+    font-size: 10px;
+  }
+
+  /* Expand max-height caps to fit taller buttons */
+  #section-widgets.open { max-height: 340px; }   /* 5 × ~44px + gaps */
+  #section-charts.open  { max-height: 420px; }   /* 7 × ~44px + gaps */
+}
+
+/* ════════════════════════════════════════════════════
+   IPAD SIDEBAR TOUCH TARGETS
+   Uses pointer:coarse (no width bounds) to target any
+   touch-primary device larger than a phone.
+   The ≤768px phone block takes priority for phones.
+   JS .is-ipad-touch class handles Magic Keyboard iPads
+   (which report pointer:fine when keyboard attached).
+════════════════════════════════════════════════════ */
+@media (pointer: coarse) and (min-width: 769px),
+       (pointer: fine)   and (min-width: 769px) and (any-pointer: coarse) {
+
+  /* Section heads: Widgets / Charts / Filters */
+  .sidebar-section-head {
+    padding: 16px 0;
+    font-size: 11px;
+  }
+  .collapsible-head {
+    min-height: 52px;
+    padding: 0;
+  }
+
+  /* Filter sub-headers: Owner, Status, AVA, etc. */
+  .sf-head {
+    padding: 16px 0;
+    min-height: 52px;
+  }
+
+  /* Widget + Chart visibility toggle buttons */
+  .vis-btn {
+    padding: 14px 12px;
+    font-size: 12px;
+    min-height: 52px;
+    margin-bottom: 8px;
+  }
+
+  /* Checkbox list items in filter panels */
+  .sf-checklist label {
+    padding: 14px 10px;
+    font-size: 13px;
+    min-height: 52px;
+  }
+  .sf-checklist input[type="checkbox"] {
+    width: 22px; height: 22px;
+  }
+}
+
+/* JS fallback: .is-ipad-touch added by script for Magic Keyboard iPads */
+.is-ipad-touch .sidebar-section-head { padding: 16px 0; font-size: 11px; }
+.is-ipad-touch .collapsible-head      { min-height: 52px; padding: 0; }
+.is-ipad-touch .sf-head               { padding: 16px 0; min-height: 52px; }
+.is-ipad-touch .vis-btn               { padding: 14px 12px; font-size: 12px; min-height: 52px; margin-bottom: 8px; }
+.is-ipad-touch .sf-checklist label    { padding: 14px 10px; font-size: 13px; min-height: 52px; }
+.is-ipad-touch .sf-checklist input[type="checkbox"] { width: 22px; height: 22px; }
+
+/* ════════════════════════════════════════════════════
+   BREAKPOINT: SMALL PHONE  ≤ 480px
+   KPIs go single column for very narrow screens
+════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: 90px;
+  }
+  .kpi { min-height: 90px; }
+  header { padding: 12px 12px 10px; }
+  .content { padding: 12px 10px; }
+  .header-left h1 { font-size: 15px; }
+  .chart-slot .card { height: 260px; }
+}
+.leaflet-popup-content-wrapper {
+  font-family: 'DM Mono', monospace;
+  border-radius: 3px;
+  box-shadow: 0 2px 12px rgba(28,23,18,0.15);
+}
+.leaflet-popup-tip { background: white; }
+.map-tooltip {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px; letter-spacing: 0.05em;
+  background: var(--ink); color: var(--cream);
+  border: none; border-radius: 3px;
+  padding: 4px 8px;
+}
+</style>
+</head>
+<body>
+
+<!-- Fixed hamburger open button — always visible on mobile, outside scroll flow -->
+<button class="mob-open-btn" id="mob-open-btn" onclick="toggleMobileSidebar()" aria-label="Open filters">
+  <span></span><span></span><span></span>
+</button>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay">
+  <div class="loading-logo">Grapevine Capital</div>
+  <div class="loading-sub">2026 Grape Sales Dashboard</div>
+  <div class="loading-dot-wrap" id="load-dots">
+    <div class="loading-dot"></div>
+    <div class="loading-dot"></div>
+    <div class="loading-dot"></div>
+    <div class="loading-dot"></div>
+    <div class="loading-dot"></div>
+  </div>
+  <div class="loading-status" id="load-status">Connecting to Microsoft 365…</div>
+  <div class="loading-error" id="load-error"></div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="header-left">
+    <button class="hamburger" id="hamburger-btn" onclick="toggleMobileSidebar()" aria-label="Toggle filters">
+      <span></span><span></span><span></span>
+    </button>
+    <div>
+      <h1>Grape Sales Dashboard</h1>
+      <div class="subtitle">2026 Vintage</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><span class="live-dot"></span>Live · SharePoint</div>
+    <div class="sync-time" id="sync-time">—</div>
+    <button class="refresh-btn" id="refresh-btn" onclick="refreshData()"><span class="refresh-icon">↺</span> <span class="refresh-label">Refresh</span></button>
+  </div>
+</header>
+<!-- Mobile sidebar overlay backdrop -->
+<div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
+<div class="app-body">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <span>Customize</span>
+      <button class="hamburger hamburger-fixed" id="hamburger-fixed" onclick="toggleMobileSidebar()" aria-label="Close filters">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+
+    <!-- Collapsible: Widgets (collapsed by default) -->
+    <div id="section-group-widgets">
+    <div class="sidebar-section-head collapsible-head" onclick="toggleSection('widgets')" style="border-top:none;">
+      <span>Widgets</span><span class="collapse-arrow" id="arrow-widgets">▲</span>
+    </div>
+    <div class="collapsible-body" id="section-widgets">
+      <button class="vis-btn" id="vis-kpi-rev"   onclick="toggleWidget('rev')">  <span class="vis-dot"></span>Gross Revenue</button>
+      <button class="vis-btn" id="vis-kpi-tons"  onclick="toggleWidget('tons')"> <span class="vis-dot"></span>Total Tons</button>
+      <button class="vis-btn" id="vis-kpi-acres" onclick="toggleWidget('acres')"><span class="vis-dot"></span>Total Acres</button>
+      <button class="vis-btn" id="vis-kpi-ppt"   onclick="toggleWidget('ppt')">  <span class="vis-dot"></span>Wtd. Avg $/Ton</button>
+      <button class="vis-btn" id="vis-kpi-tpa"   onclick="toggleWidget('tpa')">  <span class="vis-dot"></span>Wtd. Avg Tons/Acre</button>
+    </div>
+    </div>
+
+    <!-- Collapsible: Charts (collapsed by default) -->
+    <div id="section-group-charts">
+    <div class="sidebar-section-head collapsible-head" onclick="toggleSection('charts')">
+      <span>Charts</span><span class="collapse-arrow" id="arrow-charts">▲</span>
+    </div>
+    <div class="collapsible-body" id="section-charts">
+      <button class="vis-btn" id="vis-ava"   onclick="toggleChart('ava')">  <span class="vis-dot"></span>Revenue by AVA</button>
+      <button class="vis-btn" id="vis-donut" onclick="toggleChart('donut')"><span class="vis-dot"></span>Tons by Status</button>
+      <button class="vis-btn" id="vis-prog"  onclick="toggleChart('prog')"> <span class="vis-dot"></span>% Sold by Vineyard</button>
+      <button class="vis-btn" id="vis-ppt"   onclick="toggleChart('ppt')">  <span class="vis-dot"></span>$/Ton by Vineyard</button>
+      <button class="vis-btn" id="vis-var"   onclick="toggleChart('var')">  <span class="vis-dot"></span>Revenue by Varietal</button>
+      <button class="vis-btn" id="vis-term"  onclick="toggleChart('term')"> <span class="vis-dot"></span>Contract Term</button>
+      <button class="vis-btn" id="vis-cust"  onclick="toggleChart('cust')"> <span class="vis-dot"></span>Revenue by Customer</button>
+    </div>
+    </div>
+
+    <!-- Collapsible: Filters (collapsed by default) -->
+    <div class="sidebar-section-head collapsible-head" onclick="toggleSection('filters')">
+      <span>Filters</span><span class="collapse-arrow" id="arrow-filters">▲</span>
+    </div>
+    <div class="collapsible-body" id="section-filters">
+      <button class="reset-btn" id="reset-btn-top" style="margin:10px 0 10px;">↺ Reset All Filters</button>
+
+      <!-- Sub-filter: Owner -->
+      <div class="sf-head" onclick="toggleSubFilter('owner')">
+        <span class="sf-label">Owner</span>
+        <span class="sf-arrow" id="sf-arrow-owner">▲</span>
+      </div>
+      <div class="sf-body" id="sf-body-owner">
+        <select id="f-owner" multiple><option value="__all__" selected>All Owners</option></select>
+        <div class="sf-checklist" id="cl-owner"><label class="all-option"><input type="checkbox" id="cl-owner-all" value="__all__" checked> All Owners</label></div>
+      </div>
+
+      <!-- Sub-filter: Status -->
+      <div class="sf-head" onclick="toggleSubFilter('status')">
+        <span class="sf-label">Status</span>
+        <span class="sf-arrow" id="sf-arrow-status">▲</span>
+      </div>
+      <div class="sf-body" id="sf-body-status">
+        <select id="f-status" multiple><option value="__all__" selected>All Statuses</option></select>
+        <div class="sf-checklist" id="cl-status"><label class="all-option"><input type="checkbox" id="cl-status-all" value="__all__" checked> All Statuses</label></div>
+      </div>
+
+      <!-- Sub-filter: State -->
+      <div class="sf-head" onclick="toggleSubFilter('state')">
+        <span class="sf-label">State</span>
+        <span class="sf-arrow" id="sf-arrow-state">▲</span>
+      </div>
+      <div class="sf-body" id="sf-body-state">
+        <select id="f-state" multiple><option value="__all__" selected>All States</option></select>
+        <div class="sf-checklist" id="cl-state"><label class="all-option"><input type="checkbox" id="cl-state-all" value="__all__" checked> All States</label></div>
+      </div>
+
+      <!-- Sub-filter: County -->
+      <div class="sf-head" onclick="toggleSubFilter('county')">
+        <span class="sf-label">County</span>
+        <span class="sf-arrow" id="sf-arrow-county">▲</span>
+      </div>
+      <div class="sf-body" id="sf-body-county">
+        <select id="f-county" multiple><option value="__all__" selected>All Counties</option></select>
+        <div class="sf-checklist" id="cl-county"><label class="all-option"><input type="checkbox" id="cl-county-all" value="__all__" checked> All Counties</label></div>
+      </div>
+
+      <!-- Sub-filter: AVA -->
+      <div class="sf-head" onclick="toggleSubFilter('ava')">
+        <span class="sf-label">AVA</span>
+        <span class="sf-arrow" id="sf-arrow-ava">▲</span>
+      </div>
+      <div class="sf-body" id="sf-body-ava">
+        <select id="f-ava" multiple><option value="__all__" selected>All AVAs</option></select>
+        <div class="sf-checklist" id="cl-ava"><label class="all-option"><input type="checkbox" id="cl-ava-all" value="__all__" checked> All AVAs</label></div>
+      </div>
+
+      <!-- Sub-filter: Vineyard -->
+      <div class="sf-head" onclick="toggleSubFilter('vineyard')">
+        <span class="sf-label">Vineyard</span>
+        <span class="sf-arrow" id="sf-arrow-vineyard">▲</span>
+      </div>
+      <div class="sf-body" id="sf-body-vineyard">
+        <select id="f-vineyard" multiple><option value="__all__" selected>All Vineyards</option></select>
+        <div class="sf-checklist" id="cl-vineyard"><label class="all-option"><input type="checkbox" id="cl-vineyard-all" value="__all__" checked> All Vineyards</label></div>
+      </div>
+
+      <!-- Sub-filter: Varietal -->
+      <div class="sf-head" onclick="toggleSubFilter('varietal')">
+        <span class="sf-label">Varietal</span>
+        <span class="sf-arrow" id="sf-arrow-varietal">▲</span>
+      </div>
+      <div class="sf-body" id="sf-body-varietal">
+        <select id="f-varietal" multiple><option value="__all__" selected>All Varietals</option></select>
+        <div class="sf-checklist" id="cl-varietal"><label class="all-option"><input type="checkbox" id="cl-varietal-all" value="__all__" checked> All Varietals</label></div>
+      </div>
+
+      <!-- Sub-filter: Customer -->
+      <div class="sf-head" onclick="toggleSubFilter('customer')">
+        <span class="sf-label">Customer</span>
+        <span class="sf-arrow" id="sf-arrow-customer">▲</span>
+      </div>
+      <div class="sf-body" id="sf-body-customer">
+        <select id="f-customer" multiple><option value="__all__" selected>All Customers</option></select>
+        <div class="sf-checklist" id="cl-customer"><label class="all-option"><input type="checkbox" id="cl-customer-all" value="__all__" checked> All Customers</label></div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- MAIN COLUMN: content + footer, scrolls independently -->
+  <div class="main-col">
+  <main class="content" id="main-content">
+
+    <!-- TAB SWITCHER -->
+    <div class="view-tabs">
+      <button class="view-tab active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">Dashboard</button>
+      <button class="view-tab"        id="tab-btn-map"       onclick="switchTab('map')">Map</button>
+    </div>
+
+    <!-- DASHBOARD TAB: KPIs + Charts -->
+    <div id="tab-dashboard">
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-lbl">Gross Revenue</div>
+        <div class="kpi-body">
+          <div class="kpi-val" id="k-rev">—</div>
+          <div class="kpi-breakdown" id="k-rev-breakdown"></div>
+        </div>
+      </div>
+      <div class="kpi k-sage">
+        <div class="kpi-lbl">Total Tons</div>
+        <div class="kpi-body">
+          <div class="kpi-val" id="k-tons">—</div>
+          <div class="kpi-breakdown" id="k-tons-breakdown"></div>
+        </div>
+      </div>
+      <div class="kpi k-dust">
+        <div class="kpi-lbl">Total Acres</div>
+        <div class="kpi-body">
+          <div class="kpi-val" id="k-acres">—</div>
+          <div class="kpi-breakdown" id="k-acres-breakdown"></div>
+        </div>
+      </div>
+      <div class="kpi k-gold">
+        <div class="kpi-lbl">Wtd. Avg $/Ton</div>
+        <div class="kpi-body">
+          <div class="kpi-val" id="k-ppt">—</div>
+          <div class="kpi-breakdown" id="k-ppt-breakdown"></div>
+        </div>
+      </div>
+      <div class="kpi k-wine2">
+        <div class="kpi-lbl">Wtd. Avg Tons/Acre</div>
+        <div class="kpi-body">
+          <div class="kpi-val" id="k-tpa">—</div>
+          <div class="kpi-breakdown" id="k-tpa-breakdown"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DRAGGABLE CHART GRID -->
+    <div id="chart-grid">
+
+      <div class="chart-slot" id="slot-ava">
+        <div class="card" id="card-ava-rev">
+          <div class="card-head">
+            <span class="drag-handle" title="Drag to reorder">⠿</span>
+            <div class="card-title" id="ava-rev-title">Revenue by AVA</div>
+            <div class="toggle-wrap">
+              <button class="tog active" id="tog-ava-rev"  onclick="setToggle('ava','rev')">Revenue</button>
+              <button class="tog"        id="tog-ava-tons" onclick="setToggle('ava','tons')">Tons</button>
+              <div class="tog-sep"></div>
+              <button class="tog"        id="tog-ava-pct"  onclick="setToggle('avaPct')">% of Total</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart-h-ava"><canvas id="c-ava-rev"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-slot" id="slot-donut">
+        <div class="card">
+          <div class="card-head">
+            <span class="drag-handle" title="Drag to reorder">⠿</span>
+            <div class="card-title" id="donut-title">Tons by Status</div>
+            <div class="toggle-wrap">
+              <button class="tog active" id="tog-donut-tons"  onclick="setToggle('donut','tons')">Tons</button>
+              <button class="tog"        id="tog-donut-acres" onclick="setToggle('donut','acres')">Acres</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart-std"><canvas id="c-status-donut"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-slot" id="slot-prog">
+        <div class="card" id="card-prog">
+          <div class="card-head">
+            <span class="drag-handle" title="Drag to reorder">⠿</span>
+            <div class="card-title">% Sold by Vineyard</div>
+
+          </div>
+          <div class="card-body">
+            <div class="prog-list" id="prog-vineyard"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-slot" id="slot-ppt">
+        <div class="card">
+          <div class="card-head">
+            <span class="drag-handle" title="Drag to reorder">⠿</span>
+            <div class="card-title" id="ppt-title">Wtd. Avg $/Ton by Vineyard</div>
+            <div class="toggle-wrap">
+              <button class="tog active" id="tog-ppt-ppt"  onclick="setToggle('ppt','ppt')">$/Ton</button>
+              <button class="tog"        id="tog-ppt-acre" onclick="setToggle('ppt','acre')">$/Acre</button>
+              <div class="tog-sep"></div>
+              <button class="tog active" id="tog-pptSort-abs" onclick="setToggle('pptSort','abs')">Ranked</button>
+              <button class="tog"        id="tog-pptSort-ava" onclick="setToggle('pptSort','ava')">By AVA</button>
+            </div>
+          </div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:0;">
+            <div class="chart-h-ppt" style="flex:1;min-height:0;"><canvas id="c-ppt-vineyard"></canvas></div>
+            <div id="ppt-ava-legend" style="display:flex;flex-wrap:wrap;gap:6px 12px;padding:8px 2px 2px;border-top:1px solid var(--border);margin-top:4px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-slot" id="slot-var">
+        <div class="card">
+          <div class="card-head">
+            <span class="drag-handle" title="Drag to reorder">⠿</span>
+            <div class="card-title" id="var-title">Revenue by Varietal</div>
+            <div class="toggle-wrap">
+              <button class="tog active" id="tog-var-rev"  onclick="setToggle('var','rev')">Revenue</button>
+              <button class="tog"        id="tog-var-tons" onclick="setToggle('var','tons')">Tons</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart-std"><canvas id="c-var-rev"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-slot" id="slot-term">
+        <div class="card">
+          <div class="card-head">
+            <span class="drag-handle" title="Drag to reorder">⠿</span>
+            <div class="card-title" id="term-title">Revenue by Remaining Contract Term</div>
+            <div class="toggle-wrap">
+              <button class="tog active" id="tog-term-rev"  onclick="setToggle('term','rev')">Revenue</button>
+              <button class="tog"        id="tog-term-tons" onclick="setToggle('term','tons')">Tons</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart-std"><canvas id="c-term-rev"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-slot" id="slot-cust">
+        <div class="card">
+          <div class="card-head">
+            <span class="drag-handle" title="Drag to reorder">⠿</span>
+            <div class="card-title" id="cust-title">Revenue by Customer</div>
+            <div class="toggle-wrap">
+              <button class="tog active" id="tog-cust-rev"  onclick="setToggle('cust','rev')">Revenue</button>
+              <button class="tog"        id="tog-cust-tons" onclick="setToggle('cust','tons')">Tons</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="rev-list" id="rev-customer"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /#chart-grid -->
+
+    </div><!-- /#tab-dashboard -->
+
+    <!-- MAP TAB -->
+    <div id="tab-map">
+      <div id="map-container">
+        <div id="map"></div>
+        <div class="map-legend" id="map-legend"></div>
+      </div>
+    </div><!-- /#tab-map -->
+
+    <!-- ROW 4: Detail Table (always visible) -->
+    <div class="row1">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Block Detail</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="tog" id="clear-sort-btn" onclick="clearSort()" style="display:none;">✕ Clear Sort</button>
+            <div class="card-badge" id="tbl-badge">— Records</div>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div class="tbl-wrap">
+            <table>
+              <thead id="tbl-head">
+                <tr>
+                  <th data-col="vineyard">Vineyard</th>
+                  <th data-col="block">Block</th>
+                  <th data-col="varietal">Varietal</th>
+                  <th data-col="status">Status</th>
+                  <th data-col="customer">Customer</th>
+                  <th data-col="acres" class="r">Acres</th>
+                  <th data-col="tons" class="r">Tons</th>
+                  <th data-col="ppt" class="r">$/Ton</th>
+                  <th data-col="revenue" class="r">Revenue</th>
+                  <th data-col="tpa" class="r">T/Ac</th>
+                  <th data-col="finalYear" class="r">Final Yr</th>
+                  <th data-col="plantYear" class="r">Plant Yr</th>
+                  <th data-col="graftYear" class="r">Graft Yr</th>
+                  <th data-col="clone">Clone</th>
+                  <th data-col="rootstock">Rootstock</th>
+                  <th data-col="owner">Owner</th>
+                  <th data-col="ava">AVA</th>
+                  <th data-col="state">State</th>
+                  <th data-col="county">County</th>
+                </tr>
+              </thead>
+              <tbody id="tbl-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+  <footer>
+    <span>Grapevine Capital · 2026 Grape Sales Database · SharePoint Live</span>
+    <span>Showing <span class="footer-count" id="footer-count">—</span> records</span>
+  </footer>
+  </div><!-- /.main-col -->
+</div><!-- /.app-body -->
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════
+const TENANT_ID   = '19da0551-2cc9-4f4f-965b-abe6ce057e39';
+const CLIENT_ID   = 'fc35ee5d-55f7-4dc1-949b-31f2107d22f9';
+const DRIVE_ID    = 'b!THdqobnhOESr0NxVFuSL0WZopZ7ho7tPumU34s07K3exJUofRGtKR7P09Tkk-qol';
+const ITEM_ID     = '01W4NDSPSK5XQCK4BKXVCJJHZZREBVITH3';
+const SHEET_NAME  = 'Allocation';
+
+// ── MAP CONFIG ───────────────────────────────────────────────
+// GeoJSON file location — fetched via Graph API by site path.
+// GEOJSON_BLOCK_FIELD must match the property name in your
+// GeoJSON features that contains the block code.
+const GEOJSON_SITE     = 'grapevinecap.sharepoint.com:/sites/Properties:';
+const GEOJSON_PATH     = '1- Maps/gci_vineyards_2026_clean.geojson'; // path within Shared Documents
+const GEOJSON_BLOCK_FIELD = 'Block Code'; // matches GeoJSON property name
+
+// REDIRECT URI: always resolves to auth-redirect.html on the same origin.
+// Validated to ensure it cannot be manipulated to redirect to a foreign host.
+const REDIRECT_URI = (() => {
+  const loc = window.location;
+  // Only allow file:// or https:// (not javascript:, data:, etc.)
+  if (loc.protocol !== 'https:' && loc.protocol !== 'file:') {
+    throw new Error('Dashboard must be served over HTTPS or opened as a local file.');
+  }
+  const base = loc.href.split('?')[0].split('#')[0];
+  const folder = base.substring(0, base.lastIndexOf('/') + 1);
+  const uri = folder + 'auth-redirect.html';
+  // Sanity check: must be same origin
+  if (loc.protocol === 'https:' && !uri.startsWith(loc.origin + '/')) {
+    throw new Error('Redirect URI origin mismatch — possible configuration error.');
+  }
+  return uri;
+})();
+
+const msalConfig = {
+  auth: {
+    clientId: CLIENT_ID,
+    authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+    redirectUri: REDIRECT_URI
+  },
+  cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false }
+};
+
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+const SCOPES = ['Files.Read', 'Sites.Read.All'];
+
+// ═══════════════════════════════════════════════════════════
+// COLUMN INDICES (0-based) in Allocation tab
+// These will be auto-detected from header row
+// ═══════════════════════════════════════════════════════════
+let COL = {};
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let ALL_DATA = [];
+let sortCol = null, sortDir = 1;
+const chartInstances = {};
+
+// ═══════════════════════════════════════════════════════════
+// LOADING UI
+// ═══════════════════════════════════════════════════════════
+function setProgress(pct, msg) {
+  if (msg) document.getElementById('load-status').textContent = msg;
+  if (pct >= 100) {
+    // Turn all dots green on completion
+    document.querySelectorAll('.loading-dot').forEach(d => d.classList.add('done'));
+  }
+}
+function showError(msg) {
+  const el = document.getElementById('load-error');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('load-status').textContent = 'Authentication failed.';
+}
+function hideOverlay() {
+  const ov = document.getElementById('loading-overlay');
+  ov.classList.add('fade-out');
+  setTimeout(() => ov.style.display = 'none', 500);
+}
+
+// ═══════════════════════════════════════════════════════════
+// AUTH + DATA FETCH
+// ═══════════════════════════════════════════════════════════
+async function getToken() {
+  await msalInstance.initialize();
+
+  // --- Silent token attempt (uses cached session, no popup) ---
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) {
+    try {
+      const result = await msalInstance.acquireTokenSilent({
+        scopes: SCOPES,
+        account: accounts[0],
+        redirectUri: REDIRECT_URI
+      });
+      return result.accessToken;
+    } catch (silentErr) {
+      // Silent token failed — fall through to popup (no logging in production)
+    }
+  }
+
+  // --- Interactive popup ---
+  // loginPopup opens a real Microsoft login window. When the user
+  // authenticates, Microsoft redirects the popup to REDIRECT_URI
+  // (auth-redirect.html). MSAL detects that the popup URL matches
+  // the registered redirect URI, extracts the auth code from the
+  // URL hash, exchanges it for a token, resolves the promise here,
+  // and closes the popup. auth-redirect.html needs no script at all.
+  try {
+    const result = await msalInstance.loginPopup({
+      scopes: SCOPES,
+      redirectUri: REDIRECT_URI,
+      prompt: 'select_account'
+    });
+    return result.accessToken;
+  } catch (popupErr) {
+    // If popup was blocked or closed by user
+    throw new Error(
+      'Login popup was blocked or closed. ' +
+      'Please allow popups for this site and try again. (' +
+      popupErr.errorCode + ')'
+    );
+  }
+}
+
+async function fetchSheetData(token) {
+  // Fetch the used range of the Allocation worksheet
+  const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/items/${ITEM_ID}/workbook/worksheets/${encodeURIComponent(SHEET_NAME)}/usedRange`;
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Graph API error ${resp.status}: ${err}`);
+  }
+  const json = await resp.json();
+  return json.values; // 2D array
+}
+
+// ═══════════════════════════════════════════════════════════
+// PARSE ROWS
+// ═══════════════════════════════════════════════════════════
+function detectColumns(headerRow) {
+  // Map header text → index, case-insensitive, trimmed
+  const map = {};
+  headerRow.forEach((cell, i) => {
+    if (cell) map[String(cell).trim().toLowerCase()] = i;
+  });
+
+  // Try to find key columns by common header names
+  // Adjust these patterns to match your actual Allocation tab headers
+  COL.owner      = findCol(map, ['owner','entity']);
+  COL.vineyard   = findCol(map, ['vineyard','ranch','sub-vineyard']);
+  COL.varietal   = findCol(map, ['varietal','variety','grape']);
+  COL.status     = findCol(map, ['status']);
+  COL.customer   = findCol(map, ['customer','winery','buyer']);
+  COL.tons       = findCol(map, ['tons','allocated tons','contract tons','est. tons']);
+  COL.ppt        = findCol(map, ['price','$/ton','price per ton','ppt','price/ton']);
+  COL.revenue    = findCol(map, ['revenue','$ revenue','gross revenue']);
+  COL.acres      = findCol(map, ['reference acres','ref acres','ref. acres','reference_acres','referenceacres','acres ref','available acres','total acres','acreage','acres']);
+  COL.tpa        = findCol(map, ['tons/acre','t/a','tpa','yield','tons per acre']);
+  COL.ava        = findCol(map, ['dashboard ava','dashboardava','dash ava','ava','reporting region','region','appellation']);
+  COL.state      = findCol(map, ['state']);
+  COL.county     = findCol(map, ['county']);
+  COL.finalYear  = findCol(map, ['final year','last year','end year','term end','finalyear']);
+  COL.contract   = findCol(map, ['contract','contract record','contract name','contract #']);
+  COL.block      = findCol(map, ['block','block name','block id','block #']);
+  COL.blockCode  = findCol(map, ['block code','blockcode','blk code','blk cd','code']);
+  COL.plantYear  = findCol(map, ['plant year','planted','year planted','plant yr']);
+  COL.graftYear  = findCol(map, ['graft year','grafted','year grafted','graft yr']);
+  COL.clone      = findCol(map, ['clone','clone #','clone id']);
+  COL.rootstock  = findCol(map, ['rootstock','root stock','root']);
+
+  // Column detection debug output removed for production security.
+}
+
+function findCol(map, candidates) {
+  // Pass 1: exact match against every candidate before trying partials
+  for (const c of candidates) {
+    if (map[c] !== undefined) return map[c];
+  }
+  // Pass 2: partial match — header contains candidate string
+  for (const c of candidates) {
+    for (const k of Object.keys(map)) {
+      if (k.includes(c)) return map[k];
+    }
+  }
+  return null;
+}
+
+function parseRows(values) {
+  if (!values || values.length < 2) throw new Error('No data returned from spreadsheet.');
+
+  const header = values[0];
+  detectColumns(header);
+
+  const data = [];
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    if (!row || row.every(c => c === '' || c === null || c === undefined)) continue;
+
+    const getV = (idx) => (idx !== null && idx !== undefined) ? row[idx] : null;
+
+    const tonsRaw = parseFloat(getV(COL.tons)) || 0;
+    const acresRaw = parseFloat(getV(COL.acres)) || 0;
+    const pptRaw = parseFloat(getV(COL.ppt)) || 0;
+    const tpa = acresRaw > 0 ? tonsRaw / acresRaw : 0;
+
+    // Skip rows with 0 tons/acre (i.e. blocks with no yield) — but keep Open rows
+    // that may have 0 tons because they haven't been allocated yet
+    // Actually: skip rows where both tons AND acres are 0
+    if (tonsRaw === 0 && acresRaw === 0) continue;
+    // Skip rows that have acres but explicitly 0 tons/acre via column H
+    // Per user: remove blocks with 0 tons in col H (tons column)
+    if (tonsRaw === 0 && acresRaw > 0) {
+      // Only skip if tpa is explicitly 0 — i.e. no allocation at all
+      const tpaCol = getV(COL.tpa);
+      if (tpaCol !== null && parseFloat(tpaCol) === 0) continue;
+    }
+
+    const status = String(getV(COL.status) || '').trim();
+    if (!status) continue; // skip blank rows
+
+    const vineyard = String(getV(COL.vineyard) || '').trim();
+    const varietal = String(getV(COL.varietal) || '').trim();
+    const owner = String(getV(COL.owner) || '').trim();
+    if (!vineyard && !varietal && !owner) continue;
+
+    // Revenue: use spreadsheet value if available, else compute
+    let revenue = 0;
+    if (COL.revenue !== null) {
+      revenue = parseFloat(getV(COL.revenue)) || (tonsRaw * pptRaw);
+    } else {
+      revenue = tonsRaw * pptRaw;
+    }
+
+    // Final year
+    let finalYear = null;
+    const fyRaw = getV(COL.finalYear);
+    if (fyRaw) {
+      const fyNum = parseInt(fyRaw);
+      if (fyNum >= 2020 && fyNum <= 2040) finalYear = fyNum;
+    }
+
+    const ava = String(getV(COL.ava) || '').trim() || 'Unknown';
+    const state = String(getV(COL.state) || '').trim() || 'Unknown';
+    const county = String(getV(COL.county) || '').trim() || 'Unknown';
+    const customer = String(getV(COL.customer) || '').trim() || 'Open';
+    const block     = String(getV(COL.block)     || '').trim();
+    const blockCode = String(getV(COL.blockCode) || '').trim();
+    // vinCode = first 3 chars of blockCode if present, else first 3 of vineyard name
+    const vinCode   = blockCode ? blockCode.slice(0,3).toUpperCase()
+                                : vineyard.slice(0,3).toUpperCase();
+
+    const plantYear  = getV(COL.plantYear)  ? parseInt(getV(COL.plantYear))  || null : null;
+    const graftYear  = getV(COL.graftYear)  ? parseInt(getV(COL.graftYear))  || null : null;
+    const clone      = String(getV(COL.clone)     || '').trim() || null;
+    const rootstock  = String(getV(COL.rootstock) || '').trim() || null;
+
+    data.push({
+      owner, vineyard, block, blockCode, vinCode, varietal, status, customer,
+      tons: tonsRaw, ppt: pptRaw, revenue,
+      acres: acresRaw, tpa,
+      ava, state, county, finalYear,
+      plantYear, graftYear, clone, rootstock,
+      _row: i
+    });
+  }
+
+  return data;
+}
+
+// ═══════════════════════════════════════════════════════════
+// POPULATE FILTER DROPDOWNS
+// ═══════════════════════════════════════════════════════════
+// ── FILTER OPTION HELPERS ──────────────────────────────────
+
+// Sync options in a <select multiple> to a new set of valid values.
+// Preserves currently-selected items if they remain valid;
+// removes options that are no longer in the valid set;
+// adds new options that weren't present before.
+// Always keeps the "All" sentinel at index 0.
+// Detect touch device: check both media query AND touch event support
+// Media query alone misses iPads with keyboards (which report hover:hover)
+const IS_TOUCH = (
+  window.matchMedia('(hover: none) and (pointer: coarse)').matches ||
+  ('ontouchstart' in window && navigator.maxTouchPoints > 1)
+);
+
+// Detect iPad specifically (touch device wider than a phone).
+// Covers iPad with Magic Keyboard which reports pointer:fine.
+// maxTouchPoints > 1 is true on all iPads regardless of keyboard.
+const IS_IPAD = IS_TOUCH && window.innerWidth > 768;
+if (IS_IPAD) {
+  // Apply class to sidebar so CSS fallback rules activate
+  // (handles Magic Keyboard iPads where pointer:coarse media query may not fire)
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) sidebar.classList.add('is-ipad-touch');
+}
+
+// Hide the native <select multiple> elements on touch devices immediately —
+// more reliable than a CSS media query which iPads with keyboards can bypass
+if (IS_TOUCH) {
+  document.querySelectorAll('.sf-body select[multiple]').forEach(sel => {
+    sel.style.display = 'none';
+  });
+  document.querySelectorAll('.sf-checklist').forEach(cl => {
+    cl.style.display = 'flex';
+  });
+}
+
+function syncSelect(id, validValues, isCustomer) {
+  const sel = document.getElementById(id);
+  const sfName = id.replace('f-', '');
+
+  // Build the filtered, sorted set of valid option values
+  const validSet = new Set(
+    [...validValues].filter(v => v && v !== 'Unknown' && (!isCustomer || (
+      v !== 'Open' && v.toLowerCase() !== 'open' && v.toLowerCase() !== 'n/a'
+    )))
+  );
+  const sorted = [...validSet].sort((a, b) => String(a).localeCompare(String(b)));
+
+  // Snapshot which values were selected BEFORE we touch the DOM
+  // On touch devices, read from checkbox list; on desktop from select
+  const prevSelected = IS_TOUCH
+    ? getSelectedFromChecklist(sfName)
+    : new Set(Array.from(sel.selectedOptions).map(o => o.value).filter(v => v !== '__all__'));
+
+  // ── Update native <select> (used on desktop) ──
+  while (sel.options.length > 1) sel.remove(1);
+  sorted.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    sel.appendChild(opt);
+  });
+  let anySelected = false;
+  Array.from(sel.options).forEach(o => {
+    if (o.value === '__all__') return;
+    o.selected = prevSelected.has(o.value) && validSet.has(o.value);
+    if (o.selected) anySelected = true;
+  });
+  sel.options[0].selected = !anySelected;
+
+  // ── Update checkbox list (used on touch devices) ──
+  syncChecklist(sfName, sorted, prevSelected, validSet);
+
+  // On touch devices, keep select hidden and checklist visible
+  // (re-apply after every sync in case DOM rebuild reset styles)
+  if (IS_TOUCH) {
+    sel.style.display = 'none';
+    const cl = document.getElementById('cl-' + sfName);
+    if (cl) cl.style.display = 'flex';
+  }
+
+  // Resize open sub-panel
+  if (openSubFilter === sfName) {
+    requestAnimationFrame(() => resizeSelect(sfName));
+  }
+}
+
+function getSelectedFromChecklist(sfName) {
+  const cl = document.getElementById('cl-' + sfName);
+  if (!cl) return new Set();
+  const checked = new Set();
+  cl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    if (cb.value !== '__all__' && cb.checked) checked.add(cb.value);
+  });
+  return checked;
+}
+
+function syncChecklist(sfName, sorted, prevSelected, validSet) {
+  const cl = document.getElementById('cl-' + sfName);
+  if (!cl) return;
+
+  // Keep the "All" checkbox at top, rebuild the rest
+  const allCb = cl.querySelector('input[value="__all__"]');
+  // Remove all non-all labels
+  cl.querySelectorAll('label:not(.all-option)').forEach(l => l.remove());
+
+  let anyChecked = false;
+  sorted.forEach(v => {
+    const isChecked = prevSelected.has(v) && validSet.has(v);
+    if (isChecked) anyChecked = true;
+    const label = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = v;
+    cb.checked = isChecked;
+    cb.addEventListener('change', onChecklistChange.bind(null, sfName));
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(' ' + v));
+    cl.appendChild(label);
+  });
+
+  // All checkbox: checked when nothing else is selected
+  if (allCb) {
+    allCb.checked = !anyChecked;
+    // Re-attach listener (safe to re-add)
+    allCb.onchange = () => {
+      if (allCb.checked) {
+        // Deselect all others
+        cl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+          if (cb.value !== '__all__') cb.checked = false;
+        });
+      } else {
+        allCb.checked = true; // prevent deselecting "All" with nothing else
+      }
+      onChecklistChange(sfName);
+    };
+  }
+}
+
+function onChecklistChange(sfName) {
+  const cl = document.getElementById('cl-' + sfName);
+  if (!cl) return;
+  const allCb = cl.querySelector('input[value="__all__"]');
+  const others = [...cl.querySelectorAll('input[type="checkbox"]')].filter(cb => cb.value !== '__all__');
+  const anyOther = others.some(cb => cb.checked);
+  if (allCb) allCb.checked = !anyOther;
+  updateFilterOptions();
+  renderDashboard();
+  savePrefs();
+}
+
+// Initial population (first load — no cascading yet)
+function buildFilters() {
+  const uniq = field => new Set(ALL_DATA.map(d => d[field]).filter(Boolean));
+  syncSelect('f-owner',    uniq('owner'));
+  syncSelect('f-status',   uniq('status'));
+  syncSelect('f-state',    uniq('state'));
+  syncSelect('f-county',   uniq('county'));
+  syncSelect('f-ava',      uniq('ava'));
+  syncSelect('f-vineyard', uniq('vineyard'));
+  syncSelect('f-varietal', uniq('varietal'));
+  syncSelect('f-customer', uniq('customer'), true);
+}
+
+// Cascading update — called after any filter changes.
+// KEY: snapshot ALL selections first, then compute valid options for
+// each dropdown using the frozen snapshot. This prevents mid-loop
+// corruption where updating one dropdown's options changes what
+// getSelected() returns for subsequent dropdowns.
+function updateFilterOptions() {
+  const FILTER_FIELDS = [
+    { id: 'f-owner',    field: 'owner' },
+    { id: 'f-status',   field: 'status' },
+    { id: 'f-state',    field: 'state' },
+    { id: 'f-county',   field: 'county' },
+    { id: 'f-ava',      field: 'ava' },
+    { id: 'f-vineyard', field: 'vineyard' },
+    { id: 'f-varietal', field: 'varietal' },
+    { id: 'f-customer', field: 'customer' },
+  ];
+
+  const minYear = 2025; // term filter removed — no year restriction
+
+  // ── Step 1: Snapshot all current selections BEFORE modifying any dropdown ──
+  const snapshot = {};
+  FILTER_FIELDS.forEach(({ id, field }) => {
+    snapshot[field] = getSelected(id); // null = "All", Set = specific values
+  });
+
+  // ── Step 2: For each dropdown, find reachable values using all OTHER filters ──
+  FILTER_FIELDS.forEach(({ id, field }) => {
+    const reachable = ALL_DATA.filter(d => {
+      // Apply every filter except this field's own filter
+      for (const { field: f } of FILTER_FIELDS) {
+        if (f === field) continue;          // skip self
+        const sel = snapshot[f];
+        if (sel && !sel.has(d[f])) return false;
+      }
+      if (minYear > 2025 && d.finalYear !== null && d.finalYear < minYear) return false;
+      return true;
+    });
+
+    const validValues = new Set(reachable.map(d => d[field]).filter(Boolean));
+    syncSelect(id, validValues, field === 'customer');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// FILTERING
+// ═══════════════════════════════════════════════════════════
+function getSelected(id) {
+  const sfName = id.replace('f-', '');
+  if (IS_TOUCH) {
+    // Read from checkbox list on touch devices
+    const checked = getSelectedFromChecklist(sfName);
+    return checked.size > 0 ? checked : null;
+  }
+  const sel = document.getElementById(id);
+  const vals = Array.from(sel.selectedOptions).map(o => o.value);
+  if (vals.includes('__all__') || vals.length === 0) return null;
+  return new Set(vals);
+}
+
+function getFilteredData() {
+  const owners    = getSelected('f-owner');
+  const statuses  = getSelected('f-status');
+  const states    = getSelected('f-state');
+  const counties  = getSelected('f-county');
+  const avas      = getSelected('f-ava');
+  const vineyards = getSelected('f-vineyard');
+  const varietals = getSelected('f-varietal');
+  const customers = getSelected('f-customer');
+  const minYear   = 2025; // term filter removed — no year restriction
+
+  return ALL_DATA.filter(d => {
+    if (owners    && !owners.has(d.owner))       return false;
+    if (statuses  && !statuses.has(d.status))    return false;
+    if (states    && !states.has(d.state))       return false;
+    if (counties  && !counties.has(d.county))    return false;
+    if (avas      && !avas.has(d.ava))           return false;
+    if (vineyards && !vineyards.has(d.vineyard)) return false;
+    if (varietals && !varietals.has(d.varietal)) return false;
+    if (customers && !customers.has(d.customer)) return false;
+    if (minYear > 2025 && d.finalYear !== null && d.finalYear < minYear) return false;
+    return true;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════════════
+const STATUS_COLORS = {
+  'Sold':         '#3d5c38',   // sage green — in palette
+  'Open':         '#b8881e',   // gold — in palette
+  'Custom Crush': '#4a7c9e',   // muted slate blue — in AVA palette
+  'Pending':      '#7e7060',   // dust — in palette
+  'Mothball':     '#6b1f2a',   // wine — in palette
+  'FFC':          '#8b5e3c',   // warm brown — in AVA palette
+};
+
+// AVA color palette
+const AVA_PALETTE = [
+  '#6b1f2a','#b8881e','#3d5c38','#4a7c9e','#8b5e3c',
+  '#6b3fa0','#2d6a4f','#c45c2e','#1a5276','#7d6b22',
+  '#5c4033','#2e4a26','#8b2252','#1a4a6b','#4a4a1a',
+];
+const avaColorMap = {};
+function getAvaColor(ava) {
+  if (!avaColorMap[ava]) {
+    const idx = Object.keys(avaColorMap).length % AVA_PALETTE.length;
+    avaColorMap[ava] = AVA_PALETTE[idx];
+  }
+  return avaColorMap[ava];
+}
+
+function destroyChart(id) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+function mkChart(id, cfg) {
+  destroyChart(id);
+  chartInstances[id] = new Chart(document.getElementById(id).getContext('2d'), cfg);
+}
+
+const FONT = 'DM Mono';
+const TICK_STYLE = { font: { family: FONT, size: 9 }, color: '#7e7060' };
+const GRID_STYLE = { color: 'rgba(0,0,0,0.12)' };
+
+function fmtM(n)  { return '$' + (n/1e6).toFixed(1) + 'M'; }
+function fmtK(n)  { if(n>=1e6) return '$'+(n/1e6).toFixed(1)+'M'; if(n>=1e3) return '$'+(n/1e3).toFixed(0)+'K'; return '$'+Math.round(n); }
+function fmtN(n)  { return Math.round(n).toLocaleString(); }
+
+// HTML-escape user/spreadsheet data before insertion into innerHTML
+// Prevents XSS if a spreadsheet cell contains <script> or event handlers
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOGGLE STATE
+// ═══════════════════════════════════════════════════════════
+const TOGGLES = {
+  donut:   'tons',   // tons | acres
+  ava:     'rev',    // rev  | tons
+  avaPct:  false,    // false | true  (overlay: show % of total instead of raw)
+  ppt:     'ppt',    // ppt  | acre
+  pptSort: 'abs',    // abs (greatest→least) | ava (grouped by AVA)
+  var:     'rev',    // rev  | tons
+  term:    'rev',    // rev  | tons
+  cust:    'rev',    // rev  | tons
+};
+
+// Maps each toggle key to the function that redraws only that chart
+const TOGGLE_RENDER_MAP = {
+  ava:     () => render_chart_ava(getFilteredData()),
+  avaPct:  () => render_chart_ava(getFilteredData()),
+  donut:   () => render_chart_donut(getFilteredData()),
+  ppt:     () => render_chart_ppt(getFilteredData()),
+  pptSort: () => render_chart_ppt(getFilteredData()),
+  var:     () => render_chart_var(getFilteredData()),
+  term:    () => render_chart_term(getFilteredData()),
+  cust:    () => render_chart_cust(getFilteredData()),
+};
+
+function setToggle(chart, val) {
+  if (chart === 'avaPct') {
+    TOGGLES.avaPct = !TOGGLES.avaPct;
+    document.getElementById('tog-ava-pct')?.classList.toggle('active', TOGGLES.avaPct);
+  } else {
+    TOGGLES[chart] = val;
+    document.querySelectorAll(`[id^="tog-${chart}-"]`).forEach(btn => {
+      btn.classList.toggle('active', btn.id === `tog-${chart}-${val}`);
+    });
+    if (chart === 'ava') {
+      document.getElementById('tog-ava-pct')?.classList.toggle('active', TOGGLES.avaPct);
+    }
+  }
+  // Re-render only the chart whose toggle changed
+  const fn = TOGGLE_RENDER_MAP[chart];
+  if (fn) fn();
+  savePrefs();
+}
+
+// ── CHART VISIBILITY ──────────────────────────────────────
+const CHART_VISIBLE = {
+  ava: true, donut: true, prog: false, ppt: false,
+  var: false, term: false, cust: false
+};
+
+// ── WIDGET VISIBILITY ─────────────────────────────────────
+const KPI_IDS = ['rev','tons','acres','ppt','tpa'];
+const KPI_VISIBLE = { rev: true, tons: true, acres: false, ppt: false, tpa: false };
+
+function applyInitialVisibility() {
+  // KPI widgets
+  KPI_IDS.forEach(id => {
+    const btn = document.getElementById('vis-kpi-' + id);
+    if (btn) btn.classList.toggle('hidden-chart', !KPI_VISIBLE[id]);
+  });
+  // Charts
+  Object.keys(CHART_VISIBLE).forEach(id => {
+    const slot = document.getElementById('slot-' + id);
+    const btn  = document.getElementById('vis-' + id);
+    if (slot) slot.classList.toggle('slot-hidden', !CHART_VISIBLE[id]);
+    if (btn)  btn.classList.toggle('hidden-chart', !CHART_VISIBLE[id]);
+  });
+}
+
+function toggleWidget(id) {
+  KPI_VISIBLE[id] = !KPI_VISIBLE[id];
+  const btn = document.getElementById('vis-kpi-' + id);
+  if (btn) btn.classList.toggle('hidden-chart', !KPI_VISIBLE[id]);
+  updateKpiGrid();
+  savePrefs();
+}
+
+function updateKpiGrid() {
+  const grid = document.querySelector('.kpi-grid');
+  if (!grid) return;
+  const visibleCount = KPI_IDS.filter(id => KPI_VISIBLE[id]).length;
+  // On mobile, CSS media query handles columns — only override on desktop
+  if (window.innerWidth > 768) {
+    grid.style.gridTemplateColumns = `repeat(${visibleCount}, 1fr)`;
+  } else {
+    grid.style.gridTemplateColumns = ''; // let CSS media query control it
+  }
+  KPI_IDS.forEach(id => {
+    const valEl = document.getElementById('k-' + id);
+    const kpiEl = valEl?.closest('.kpi');
+    if (kpiEl) kpiEl.style.display = KPI_VISIBLE[id] ? '' : 'none';
+  });
+  setTimeout(scaleKpiText, 50);
+}
+
+function toggleChart(id) {
+  CHART_VISIBLE[id] = !CHART_VISIBLE[id];
+  const slot = document.getElementById('slot-' + id);
+  const btn  = document.getElementById('vis-' + id);
+  if (slot) slot.classList.toggle('slot-hidden', !CHART_VISIBLE[id]);
+  if (btn)  btn.classList.toggle('hidden-chart', !CHART_VISIBLE[id]);
+  setTimeout(renderDashboard, 50);
+  savePrefs();
+}
+
+// ── COLLAPSIBLE TOP SECTIONS ─────────────────────────────
+// Opening one section collapses the other to prevent overflow.
+const TOP_SECTIONS = ['widgets', 'charts', 'filters'];
+
+function toggleSection(id) {
+  const body  = document.getElementById('section-' + id);
+  const arrow = document.getElementById('arrow-' + id);
+  if (!body) return;
+  const opening = !body.classList.contains('open');
+
+  if (opening) {
+    // Collapse every OTHER top section
+    TOP_SECTIONS.forEach(other => {
+      if (other === id) return;
+      const ob = document.getElementById('section-' + other);
+      const oa = document.getElementById('arrow-' + other);
+      if (ob) ob.classList.remove('open');
+      if (oa) oa.classList.remove('open');
+      // If closing the filters section, also collapse any open sub-filter
+      if (other === 'filters' && openSubFilter) {
+        const pb = document.getElementById('sf-body-' + openSubFilter);
+        const pa = document.getElementById('sf-arrow-' + openSubFilter);
+        if (pb) pb.classList.remove('open');
+        if (pa) pa.classList.remove('open');
+        openSubFilter = null;
+      }
+    });
+    body.classList.add('open');
+    if (arrow) arrow.classList.add('open');
+    // On mobile: toggle .filters-open on sidebar to hide/show widgets+charts heads
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.toggle('filters-open', id === 'filters');
+    // After transition finishes, resize any open sub-filter selects
+    // (charts section may have changed available height)
+    setTimeout(resizeOpenSelects, 340);
+  } else {
+    // Closing this section
+    if (id === 'filters' && openSubFilter) {
+      // Collapse open sub-filter when parent filters section closes
+      const pb = document.getElementById('sf-body-' + openSubFilter);
+      const pa = document.getElementById('sf-arrow-' + openSubFilter);
+      if (pb) pb.classList.remove('open');
+      if (pa) pa.classList.remove('open');
+      openSubFilter = null;
+    }
+    body.classList.remove('open');
+    if (arrow) arrow.classList.remove('open');
+    // Remove filters-open if we just closed filters
+    if (id === 'filters') {
+      document.getElementById('sidebar')?.classList.remove('filters-open');
+    }
+  }
+}
+
+// ── SUB-FILTER ACCORDION ──────────────────────────────────
+// Only one sub-filter open at a time; auto-sizes the <select>
+// to fit all options or available sidebar space.
+let openSubFilter = null;
+
+function toggleSubFilter(name) {
+  const body  = document.getElementById('sf-body-' + name);
+  const arrow = document.getElementById('sf-arrow-' + name);
+  if (!body) return;
+
+  if (openSubFilter && openSubFilter !== name) {
+    // Collapse the previously open sub-filter
+    const pb = document.getElementById('sf-body-' + openSubFilter);
+    const pa = document.getElementById('sf-arrow-' + openSubFilter);
+    if (pb) pb.classList.remove('open');
+    if (pa) pa.classList.remove('open');
+    // Remove sticky from the previously open head
+    const prevHead = pb?.previousElementSibling;
+    if (prevHead) prevHead.classList.remove('sf-head-open');
+  }
+
+  const opening = !body.classList.contains('open');
+  body.classList.toggle('open', opening);
+  if (arrow) arrow.classList.toggle('open', opening);
+  openSubFilter = opening ? name : null;
+
+  // Apply/remove sticky on this head
+  const head = body.previousElementSibling;
+  if (head) head.classList.toggle('sf-head-open', opening);
+
+  if (opening) {
+    setTimeout(() => resizeSelect(name), 50);
+  }
+}
+
+// Size a <select> to fill all available sidebar space below it.
+// Anchors off the sidebar top + known pixel heights of fixed elements
+// to avoid any dependency on mid-transition getBoundingClientRect.
+const SF_ORDER    = ['owner','status','state','county','ava','vineyard','varietal','customer'];
+const SF_HEAD_H   = 31;   // px: each sf-head row height (collapsed)
+const RESET_BTN_H = 52;   // px: top reset button + its margin-top
+const SIDEBAR_PAD_TOP = 20; // px: sidebar top padding
+const SIDEBAR_PAD_BOT = 20; // px: sidebar bottom padding
+// Heights of fixed sidebar elements above the filters section:
+// sidebar-head (~46px) + Charts section-head (~42px) + Filters section-head (~42px)
+// These are measured once after load and cached.
+let _sidebarFixedAbove = null;
+
+function getSidebarFixedAbove() {
+  if (_sidebarFixedAbove !== null) return _sidebarFixedAbove;
+  const sidebar       = document.getElementById('sidebar');
+  const sidebarHead   = sidebar?.querySelector('.sidebar-head');
+  const filtersHead   = document.getElementById('section-filters')?.previousElementSibling;
+  const chartsHead    = document.getElementById('section-charts')?.previousElementSibling;
+  const chartsSection = document.getElementById('section-charts');
+  let h = SIDEBAR_PAD_TOP;
+  if (sidebarHead)   h += sidebarHead.offsetHeight + 16; // + margin-bottom
+  if (chartsHead)    h += chartsHead.offsetHeight;
+  if (chartsSection?.classList.contains('open')) h += chartsSection.scrollHeight;
+  if (filtersHead)   h += filtersHead.offsetHeight;
+  // top reset button (always visible when filters section open)
+  h += RESET_BTN_H;
+  return h; // don't cache — charts section height changes
+}
+
+function resizeSelect(name) {
+  const sel     = document.getElementById('f-' + name);
+  const sfHead  = document.getElementById('sf-body-' + name)?.previousElementSibling;
+  const resetBtn = document.getElementById('reset-btn-top');
+  const sidebar  = document.getElementById('sidebar');
+  if (!sel || !sfHead || !sidebar) return;
+
+  const optionCount = sel.options.length;
+  const ROW_H  = 22;
+  const idealH = optionCount * ROW_H + 6;
+
+  // Measure how many sf-heads are BELOW this one (they're always visible and stable)
+  const myIdx      = SF_ORDER.indexOf(name);
+  const headsBelow = myIdx >= 0 ? SF_ORDER.length - 1 - myIdx : 0;
+
+  // Anchor: bottom of sidebar visible area
+  const sidebarRect = sidebar.getBoundingClientRect();
+  const sidebarBot  = sidebarRect.bottom - SIDEBAR_PAD_BOT;
+
+  // Top of this select = bottom of its sf-head (stable, doesn't move during transition)
+  const headRect  = sfHead.getBoundingClientRect();
+  const selectTop = headRect.bottom;
+
+  // Space below = sidebar bottom minus heads below minus reset button minus small pad
+  const reservedBelow = headsBelow * SF_HEAD_H + RESET_BTN_H + 4;
+  const available = Math.max(60, sidebarBot - selectTop - reservedBelow);
+
+  sel.style.height = Math.min(idealH, available) + 'px';
+}
+
+// Re-size the currently open select (called after section transitions)
+function resizeOpenSelects() {
+  if (openSubFilter) resizeSelect(openSubFilter);
+}
+
+// ── DRAG AND DROP ─────────────────────────────────────────
+let dragSrc = null;
+
+function initDragDrop() {
+  const grid = document.getElementById('chart-grid');
+  if (!grid) return;
+
+  // On touch-primary devices, skip drag entirely — taps must work normally.
+  // matchMedia hover:none is the most reliable way to detect touch-only devices.
+  const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  if (isTouch) return;
+
+  // Enable dragging only on desktop
+  grid.querySelectorAll('.chart-slot').forEach(slot => slot.setAttribute('draggable', 'true'));
+
+  grid.addEventListener('dragstart', e => {
+    const slot = e.target.closest('.chart-slot');
+    if (!slot) return;
+    // Don't start drag if clicking toggle buttons
+    if (e.target.closest('.tog, .toggle-wrap, select, button:not(.drag-handle)')) {
+      e.preventDefault(); return;
+    }
+    dragSrc = slot;
+    slot.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', slot.id);
+  });
+
+  grid.addEventListener('dragend', e => {
+    const slot = e.target.closest('.chart-slot');
+    if (slot) slot.classList.remove('dragging');
+    document.querySelectorAll('.chart-slot.drag-over').forEach(s => s.classList.remove('drag-over'));
+    dragSrc = null;
+  });
+
+  grid.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const target = e.target.closest('.chart-slot');
+    if (!target || target === dragSrc) return;
+    document.querySelectorAll('.chart-slot.drag-over').forEach(s => s.classList.remove('drag-over'));
+    target.classList.add('drag-over');
+  });
+
+  grid.addEventListener('dragleave', e => {
+    const target = e.target.closest('.chart-slot');
+    if (target) target.classList.remove('drag-over');
+  });
+
+  grid.addEventListener('drop', e => {
+    e.preventDefault();
+    const target = e.target.closest('.chart-slot');
+    if (!target || !dragSrc || target === dragSrc) return;
+    target.classList.remove('drag-over');
+
+    // Determine insertion point
+    const slots  = [...grid.querySelectorAll('.chart-slot')];
+    const srcIdx = slots.indexOf(dragSrc);
+    const tgtIdx = slots.indexOf(target);
+
+    if (srcIdx < tgtIdx) {
+      target.after(dragSrc);
+    } else {
+      target.before(dragSrc);
+    }
+    // Redraw charts to fix canvas sizing after reflow
+    setTimeout(renderDashboard, 50);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// KPI TEXT SCALING
+// ═══════════════════════════════════════════════════════════
+function scaleKpiText() {
+  const kpis = document.querySelectorAll('.kpi:not([style*="display: none"])');
+  kpis.forEach(kpi => {
+    const kpiH = kpi.offsetHeight;
+    if (kpiH < 20) return;
+
+    const lblEl  = kpi.querySelector('.kpi-lbl');
+    const valEl  = kpi.querySelector('.kpi-val');
+    const blines = kpi.querySelectorAll('.bline-label, .bline-val');
+    if (!blines.length) return;
+
+    // Available height for blines = total card height minus:
+    //   vertical padding (28px top+bottom), border (3px top),
+    //   label row (~14px), margin between label and body (~4px)
+    const PAD = 31; // padding + border
+    const LBL = 14; // label row approximate height
+    const BODY_GAP = 4;
+    const avail = Math.max(24, kpiH - PAD - LBL - BODY_GAP);
+
+    // 4 blines share available height; 85% fill factor for visual breathing room
+    const lineH = (avail / 4) * 0.85;
+
+    // Constrain by the actual breakdown column width.
+    // Detect layout: mobile (≤768) = 2 cols no sidebar; small (≤480) = 1 col no sidebar
+    const isMobile  = window.innerWidth <= 768;
+    const isSmall   = window.innerWidth <= 480;
+    const sidebarW  = isMobile ? 0 : (window.innerWidth <= 1024 ? 220 : 252);
+    const padW      = isMobile ? 28 : 56;
+    const visCount  = KPI_IDS.filter(id => KPI_VISIBLE[id]).length;
+    const cols      = isSmall ? 1 : (isMobile ? Math.min(2, visCount) : visCount);
+    const cellW     = Math.max(100, (window.innerWidth - sidebarW - padW) / cols - (cols > 1 ? 20 : 10));
+    const breakdownW = Math.max(60, cellW * 0.48 - 6);
+    // Longest label+value: "Custom Crush $45.2M" ≈ 19 chars; DM Mono char width ≈ 0.58× font-size
+    const maxByW     = breakdownW / (19 * 0.58);
+    const fs         = Math.max(9, Math.min(13, lineH, maxByW));
+
+    // .kpi-bline is display:contents — style the actual rendered spans instead
+    kpi.querySelectorAll('.bline-label, .bline-val').forEach(el => {
+      el.style.fontSize = fs.toFixed(1) + 'px';
+    });
+
+    // Label: slightly smaller than bline, same tracking
+    const lblFs = Math.max(7, Math.min(9, fs * 0.72));
+    if (lblEl) lblEl.style.fontSize = lblFs.toFixed(1) + 'px';
+
+    // Big value: 2.2× bline, constrained 20-32px
+    const valFs = Math.max(20, Math.min(32, fs * 2.2));
+    if (valEl) valEl.style.fontSize = valFs.toFixed(1) + 'px';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// DASHBOARD RENDER
+// ═══════════════════════════════════════════════════════════
+function renderDashboard() {
+  const data = getFilteredData();
+  // Keep map in sync with filters
+  if (activeTab === 'map') updateMap();
+
+  // ── KPIs ──
+  const totalRev   = data.reduce((s,d) => s + d.revenue, 0);
+  const totalTons  = data.reduce((s,d) => s + d.tons, 0);
+  const totalAcres = data.reduce((s,d) => s + d.acres, 0);
+  const wtdPPT     = totalTons  > 0 ? totalRev  / totalTons  : 0;
+  const wtdTPA     = totalAcres > 0 ? totalTons / totalAcres : 0;
+
+  // Per-status aggregates for breakdowns
+  const KPI_STATUSES = ['Sold','Pending','Custom Crush','Open'];
+  const byStatus = {};
+  KPI_STATUSES.forEach(st => {
+    const rows = data.filter(d => d.status === st);
+    byStatus[st] = {
+      rev:   rows.reduce((s,d) => s + d.revenue, 0),
+      tons:  rows.reduce((s,d) => s + d.tons,    0),
+      acres: rows.reduce((s,d) => s + d.acres,   0),
+    };
+    byStatus[st].ppt = byStatus[st].tons  > 0 ? byStatus[st].rev  / byStatus[st].tons  : 0;
+    byStatus[st].tpa = byStatus[st].acres > 0 ? byStatus[st].tons / byStatus[st].acres : 0;
+  });
+
+  function blineHTML(rows) {
+    // Each row becomes two grid cells: right-aligned label and left-aligned value
+    return rows.map(([lbl, val]) =>
+      `<span class="bline-label">${esc(lbl)}:</span><span class="bline-val">${val}</span>`
+    ).join('');
+  }
+
+  document.getElementById('k-rev').textContent   = fmtM(totalRev);
+  document.getElementById('k-rev-breakdown').innerHTML = blineHTML(
+    KPI_STATUSES.map(st => [st, fmtM(byStatus[st].rev)])
+  );
+
+  document.getElementById('k-tons').textContent  = fmtN(totalTons);
+  document.getElementById('k-tons-breakdown').innerHTML = blineHTML(
+    KPI_STATUSES.map(st => [st, fmtN(byStatus[st].tons) + ' T'])
+  );
+
+  document.getElementById('k-acres').textContent = fmtN(totalAcres);
+  document.getElementById('k-acres-breakdown').innerHTML = blineHTML(
+    KPI_STATUSES.map(st => [st, fmtN(byStatus[st].acres) + ' ac'])
+  );
+
+  document.getElementById('k-ppt').textContent   = '$' + fmtN(wtdPPT);
+  document.getElementById('k-ppt-breakdown').innerHTML = blineHTML(
+    KPI_STATUSES.map(st => [st, byStatus[st].ppt > 0 ? '$' + fmtN(byStatus[st].ppt) : '—'])
+  );
+
+  document.getElementById('k-tpa').textContent   = wtdTPA.toFixed(2);
+  document.getElementById('k-tpa-breakdown').innerHTML = blineHTML(
+    KPI_STATUSES.map(st => [st, byStatus[st].tpa > 0 ? byStatus[st].tpa.toFixed(2) : '—'])
+  );
+
+  // Scale KPI text to fill widget height
+  setTimeout(scaleKpiText, 20);
+
+
+  // ── Charts ──
+  render_chart_ava(data);
+  render_chart_donut(data);
+  render_chart_prog(data);
+  render_chart_ppt(data);
+  render_chart_var(data);
+  render_chart_term(data);
+  render_chart_cust(data);
+  render_table(data);
+}
+
+function render_chart_ava(data) {
+  // ── Chart 1: Revenue/Tons/% by AVA or Vineyard ──
+  const avasInData = [...new Set(data.map(d=>d.ava))].filter(Boolean);
+  const singleAva  = avasInData.length === 1;
+  const groupField = singleAva ? 'vineyard' : 'ava';
+  const groupLabels = singleAva
+    ? [...new Set(data.map(d=>d.vineyard))].sort()
+    : avasInData.sort();
+  const avaMode   = TOGGLES.ava;    // 'rev' | 'tons'
+  const avaIsPct  = TOGGLES.avaPct;  // true = show % of group total
+  const statuses = ['Sold','Open','Custom Crush','Pending'];
+
+  // For pct mode: per-group totals (same metric as selected)
+  const groupTotals = {};
+  if (avaIsPct) {
+    groupLabels.forEach(g => {
+      groupTotals[g] = data.filter(d=>d[groupField]===g)
+        .reduce((s,d) => s + (avaMode==='rev' ? d.revenue : d.tons), 0);
+    });
+  }
+
+  const avaDatasets = statuses.map(st => ({
+    label: st,
+    data: groupLabels.map(g => {
+      const raw = data.filter(d=>d[groupField]===g&&d.status===st)
+                     .reduce((s,d) => s + (avaMode==='rev' ? d.revenue : d.tons), 0);
+      if (avaIsPct) return groupTotals[g] > 0 ? (raw / groupTotals[g]) * 100 : 0;
+      return avaMode==='rev' ? raw / 1e6 : raw;
+    }),
+    backgroundColor: STATUS_COLORS[st] || '#aaa',
+    borderRadius: 2,
+  }));
+
+  const avaBase = singleAva ? `by Vineyard (${avasInData[0]})` : 'by AVA';
+  const avaMetric = avaMode==='rev' ? 'Revenue' : 'Tons';
+  document.getElementById('ava-rev-title').textContent =
+    avaIsPct ? `% ${avaMetric} by Status ` + avaBase : avaMetric + ' ' + avaBase;
+
+  mkChart('c-ava-rev', {
+    type: 'bar',
+    data: { labels: groupLabels, datasets: avaDatasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { font:{family:FONT,size:9}, color:'#1c1712', boxWidth:10 } } },
+      scales: {
+        x: { stacked:true, ticks:{...TICK_STYLE,maxRotation:35}, grid:{display:false} },
+        y: {
+          stacked: true,
+          max: avaIsPct ? 100 : undefined,
+          ticks:{...TICK_STYLE,
+            callback: v => avaIsPct ? v.toFixed(0)+'%'
+                         : avaMode==='rev' ? '$'+v.toFixed(0)+'M'
+                         : fmtN(v)+'T'
+          }, grid:GRID_STYLE
+        }
+      }
+    }
+  });
+}
+
+function render_chart_donut(data) {
+  // ── Chart 2: Status Donut (tons or acres) ──
+  const donutMode = TOGGLES.donut;
+  document.getElementById('donut-title').textContent =
+    donutMode === 'tons' ? 'Tons by Status' : 'Acreage by Status';
+  const statusAgg = {};
+  data.forEach(d => {
+    statusAgg[d.status] = (statusAgg[d.status]||0) + (donutMode==='tons' ? d.tons : d.acres);
+  });
+  const statusKeys = Object.keys(statusAgg).sort((a,b)=>statusAgg[b]-statusAgg[a]);
+  const donutTotal = statusKeys.reduce((s,k)=>s+statusAgg[k], 0);
+  const donutUnit = donutMode === 'tons' ? 'T' : 'ac';
+  mkChart('c-status-donut', {
+    type: 'doughnut',
+    data: {
+      labels: statusKeys,
+      datasets: [{ data: statusKeys.map(s=>statusAgg[s]),
+        backgroundColor: statusKeys.map(s=>STATUS_COLORS[s]||'#aaa'),
+        borderWidth: 3, borderColor: '#fff' }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, cutout:'40%',
+      layout: { padding: 4 },
+      plugins: {
+        legend: { position:'right', labels:{font:{family:FONT,size:9},color:'#1c1712',padding:12,boxWidth:10} },
+        tooltip: { callbacks: { label: ctx =>
+          ` ${ctx.label}: ${fmtN(ctx.raw)}${donutUnit} (${donutTotal>0?(ctx.raw/donutTotal*100).toFixed(1):0}%)`
+        }}
+      }
+    }
+  });
+}
+
+function render_chart_prog(data) {
+  // ── Progress bars: % sold by vineyard, sorted most→least ──
+  const vinMap = {};
+  data.forEach(d => {
+    if (!vinMap[d.vineyard]) vinMap[d.vineyard] = {sold:0,total:0};
+    vinMap[d.vineyard].total += d.tons;
+    if (d.status==='Sold') vinMap[d.vineyard].sold += d.tons;
+  });
+  // Sort by % sold descending, include ALL vineyards
+  const vinList = Object.entries(vinMap)
+    .map(([name,v]) => ({name, pct: v.total>0 ? v.sold/v.total : 0, sold:v.sold, total:v.total}))
+    .sort((a,b) => b.pct-a.pct || b.total-a.total);
+
+  document.getElementById('prog-vineyard').innerHTML = vinList.map(v => `
+    <div class="prog-item">
+      <div class="prog-meta">
+        <span class="prog-name">${esc(v.name)}</span>
+        <span class="prog-stat">${(v.pct*100).toFixed(0)}% · ${fmtN(v.sold)}/${fmtN(v.total)}T</span>
+      </div>
+      <div class="prog-bg"><div class="prog-fill" style="width:${v.pct*100}%"></div></div>
+    </div>`).join('');
+}
+
+function render_chart_ppt(data) {
+  // ── Chart 4: $/Ton or Acres by Vineyard, axis uses vinCode ──
+  const pptMode = TOGGLES.ppt; // 'ppt' or 'acre'
+  document.getElementById('ppt-title').textContent =
+    pptMode === 'ppt' ? 'Wtd. Avg $/Ton by Vineyard' : 'Wtd. Avg $/Acre by Vineyard';
+  const vinAgg = data.reduce((acc,d) => {
+    if (!acc[d.vineyard]) acc[d.vineyard] = {rev:0, tons:0, acres:0, ava:d.ava, code:d.vinCode};
+    acc[d.vineyard].rev   += d.revenue;
+    acc[d.vineyard].tons  += d.tons;
+    acc[d.vineyard].acres += d.acres;
+    return acc;
+  }, {});
+  const pptSortMode = TOGGLES.pptSort; // 'abs' | 'ava'
+  const vinPPT = Object.entries(vinAgg)
+    .map(([name,v]) => ({
+      name,
+      code: v.code || name.slice(0,3).toUpperCase(),
+      val: pptMode==='ppt' ? (v.tons>0 ? v.rev/v.tons : 0) : (v.acres>0 ? v.rev/v.acres : 0),
+      ava: v.ava
+    }))
+    .filter(v => v.val > 0)
+    .sort((a,b) => {
+      if (pptSortMode === 'ava') {
+        const avaCmp = a.ava.localeCompare(b.ava);
+        return avaCmp !== 0 ? avaCmp : b.val - a.val; // within AVA: highest first
+      }
+      return b.val - a.val; // absolute: highest first
+    });
+
+
+  mkChart('c-ppt-vineyard', {
+    type: 'bar',
+    data: {
+      labels: vinPPT.map(v=>v.code),
+      datasets: [{
+        data: vinPPT.map(v=>v.val),
+        backgroundColor: vinPPT.map(v=>getAvaColor(v.ava)),
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          label: ctx => pptMode==='ppt'
+            ? ` $${fmtN(ctx.raw)}/T`
+            : ` $${fmtN(ctx.raw)}/ac`,
+          title: ([ctx]) => vinPPT[ctx.dataIndex].name,
+          afterLabel: ctx => ` AVA: ${vinPPT[ctx.dataIndex].ava}`
+        }}
+      },
+      scales:{
+        x:{ticks:{...TICK_STYLE, maxRotation:40, font:{family:FONT,size:9}},grid:{display:false}},
+        y:{ticks:{...TICK_STYLE,
+          callback: v => '$'+fmtN(v)
+        }, grid:GRID_STYLE}
+      }
+    }
+  });
+
+  // ── AVA Legend for $/Ton chart ──
+  (function() {
+    const legendEl = document.getElementById('ppt-ava-legend');
+    if (!legendEl) return;
+    // Collect unique AVAs present in vinPPT (already filtered/sorted)
+    const seenAvas = [];
+    vinPPT.forEach(v => { if (!seenAvas.includes(v.ava)) seenAvas.push(v.ava); });
+    legendEl.innerHTML = seenAvas.map(ava => {
+      const col = getAvaColor(ava);
+      // col is from a fixed palette (not spreadsheet data), ava text is escaped
+      return `<span style="display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:8px;color:var(--dust);letter-spacing:0.08em;white-space:nowrap;">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${col};flex-shrink:0;"></span>${esc(ava)}
+      </span>`;
+    }).join('');
+  })();
+}
+
+function render_chart_var(data) {
+  // ── Chart 5: Revenue or Tons by Varietal (top 12), stacked by Status ──
+  const varMode = TOGGLES.var;
+  document.getElementById('var-title').textContent =
+    varMode === 'rev' ? 'Revenue by Varietal' : 'Tons by Varietal';
+
+  // Aggregate per varietal×status
+  const varStatusAgg = {};
+  data.forEach(d => {
+    if (!varStatusAgg[d.varietal]) varStatusAgg[d.varietal] = {};
+    varStatusAgg[d.varietal][d.status] =
+      (varStatusAgg[d.varietal][d.status] || 0) + (varMode==='rev' ? d.revenue : d.tons);
+  });
+  // Rank varietals by total, take top 12
+  const varTotals = Object.entries(varStatusAgg)
+    .map(([v, ss]) => [v, Object.values(ss).reduce((a,b)=>a+b,0)])
+    .sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const varLabels = varTotals.map(v=>v[0]);
+  const varStatuses = ['Sold','Open','Custom Crush','Pending','Mothball','FFC'];
+  const varDatasets = varStatuses
+    .filter(st => data.some(d=>d.status===st))
+    .map(st => ({
+      label: st,
+      data: varLabels.map(varietal =>
+        ((varStatusAgg[varietal]||{})[st]||0) / (varMode==='rev' ? 1e6 : 1)
+      ),
+      backgroundColor: STATUS_COLORS[st] || '#7e7060',
+      borderRadius: 2,
+    }));
+  mkChart('c-var-rev', {
+    type:'bar',
+    data:{ labels: varLabels, datasets: varDatasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ labels:{ font:{family:FONT,size:9}, color:'#1c1712', boxWidth:10 } },
+        tooltip:{ callbacks:{
+          label: ctx => varMode==='rev'
+            ? ` ${ctx.dataset.label}: $${ctx.raw.toFixed(1)}M`
+            : ` ${ctx.dataset.label}: ${fmtN(ctx.raw)} T`
+        }}
+      },
+      scales:{
+        x:{ stacked:true, ticks:{...TICK_STYLE,maxRotation:38}, grid:{display:false} },
+        y:{ stacked:true, ticks:{...TICK_STYLE,
+          callback: v => varMode==='rev' ? '$'+v+'M' : fmtN(v)
+        }, grid:GRID_STYLE }
+      }
+    }
+  });
+}
+
+function render_chart_term(data) {
+  // ── Chart 6: Revenue or Tons by Remaining Contract Term ──
+  // Grouping: "Open" status = own column; no finalYear OR finalYear<=2025 = "EG"; else year
+  const termMode = TOGGLES.term;
+  document.getElementById('term-title').textContent =
+    termMode === 'rev' ? 'Revenue by Remaining Contract Term' : 'Tons by Remaining Contract Term';
+  const termMap = {};
+  data.forEach(d => {
+    let label;
+    if (d.status === 'Open') {
+      label = 'Open';
+    } else if (!d.finalYear || Number(d.finalYear) <= 2025) {
+      label = 'EG';
+    } else {
+      label = String(d.finalYear);
+    }
+    termMap[label] = (termMap[label]||0) + (termMode==='rev' ? d.revenue : d.tons);
+  });
+  const termLabels = Object.keys(termMap).sort((a, b) => {
+    if (a === 'Open') return -1;
+    if (b === 'Open') return 1;
+    if (a === 'EG')   return -1;
+    if (b === 'EG')   return 1;
+    return parseInt(a) - parseInt(b);
+  });
+  mkChart('c-term-rev', {
+    type: 'bar',
+    data: {
+      labels: termLabels,
+      datasets: [{
+        data: termLabels.map(l => termMode==='rev' ? termMap[l]/1e6 : termMap[l]),
+        backgroundColor: 'rgb(107,31,42)', borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx =>
+          termMode==='rev' ? ` $${ctx.raw.toFixed(1)}M` : ` ${fmtN(ctx.raw)} T`
+        }}
+      },
+      scales: {
+        x: { ticks: { ...TICK_STYLE,
+          callback: v => termMode==='rev' ? '$'+v+'M' : fmtN(v)
+        }, grid: GRID_STYLE },
+        y: { ticks: { ...TICK_STYLE }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function render_chart_cust(data) {
+  // ── Chart 7: Revenue or Tons by Customer (scrollable progress bars) ──
+  const custMode = TOGGLES.cust;
+  document.getElementById('cust-title').textContent =
+    custMode === 'rev' ? 'Revenue by Customer' : 'Tons by Customer';
+  const custAgg = {};
+  data.forEach(d => {
+    const c = d.customer;
+    if (!c || c.toLowerCase() === 'open' || c === '') return;
+    custAgg[c] = (custAgg[c]||0) + (custMode==='rev' ? d.revenue : d.tons);
+  });
+  const custList = Object.entries(custAgg)
+    .sort((a,b) => b[1]-a[1]);
+  const custMax = custList.length > 0 ? custList[0][1] : 1;
+  document.getElementById('rev-customer').innerHTML = custList.map(([name, val]) => `
+    <div class="rev-item">
+      <div class="rev-meta">
+        <span class="rev-name">${esc(name)}</span>
+        <span class="rev-stat">${custMode==='rev' ? fmtK(val) : fmtN(val)+' T'}</span>
+      </div>
+      <div class="rev-bg"><div class="rev-fill" style="width:${(val/custMax*100).toFixed(1)}%"></div></div>
+    </div>`).join('');
+}
+
+function render_table(data) {
+  // ── Detail Table ──
+  const tableData = sortCol
+    ? [...data].sort((a,b)=>{
+        const av=a[sortCol]??'', bv=b[sortCol]??'';
+        return typeof av==='number' ? (av-bv)*sortDir : String(av).localeCompare(String(bv))*sortDir;
+      })
+    : data;
+
+  // Compute totals for footer row
+  const totTons    = tableData.reduce((s,d) => s + d.tons, 0);
+  const totRev     = tableData.reduce((s,d) => s + d.revenue, 0);
+  const totAcres   = tableData.reduce((s,d) => s + d.acres, 0);
+  const totTPA     = totAcres > 0 ? totTons / totAcres : 0;
+  const totWtdPPT  = totTons  > 0 ? totRev  / totTons  : 0;
+
+  const totalRow = `
+    <tr style="background:var(--parchment2);font-weight:500;border-top:2px solid var(--border);">
+      <td><em>Total</em></td>
+      <td></td><td></td><td></td><td></td>
+      <td class="r">${fmtN(totAcres)}</td>
+      <td class="r">${fmtN(totTons)}</td>
+      <td class="r">$${fmtN(totWtdPPT)}</td>
+      <td class="r">${fmtK(totRev)}</td>
+      <td class="r">${totTPA > 0 ? totTPA.toFixed(1) : ''}</td>
+      <td class="r"></td><td class="r"></td><td class="r"></td><td></td><td></td>
+      <td></td><td></td><td></td><td></td>
+    </tr>`;
+
+  document.getElementById('tbl-body').innerHTML = tableData.map((d,i)=>`
+    <tr class="tbl-row" data-blockcode="${esc(d.blockCode||'')}" onclick="flyToBlock('${esc(d.blockCode||'')}')">
+      <td>${esc(d.vineyard)}</td>
+      <td>${esc(d.block)||'—'}</td>
+      <td>${esc(d.varietal)}</td>
+      <td><span class="pill p-${esc(d.status.toLowerCase().replace(/\s+/g,'-').replace('custom-crush','cc'))}">${esc(d.status)}</span></td>
+      <td>${esc(d.customer)}</td>
+      <td class="r">${fmtN(d.acres)}</td>
+      <td class="r">${fmtN(d.tons)}</td>
+      <td class="r">$${fmtN(d.ppt)}</td>
+      <td class="r">${fmtK(d.revenue)}</td>
+      <td class="r">${d.tpa>0?d.tpa.toFixed(1):'—'}</td>
+      <td class="r">${d.finalYear??'—'}</td>
+      <td class="r">${d.plantYear??'—'}</td>
+      <td class="r">${d.graftYear??'—'}</td>
+      <td>${esc(d.clone??'—')}</td>
+      <td>${esc(d.rootstock??'—')}</td>
+      <td>${esc(d.owner)}</td>
+      <td>${esc(d.ava)}</td>
+      <td>${esc(d.state)}</td>
+      <td>${esc(d.county)}</td>
+    </tr>`).join('') + totalRow;
+
+  document.getElementById('tbl-badge').textContent  = `${fmtN(tableData.length)} Records`;
+  document.getElementById('footer-count').textContent = fmtN(tableData.length);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// TABLE SORT
+// ═══════════════════════════════════════════════════════════
+function updateClearSortBtn() {
+  const btn = document.getElementById('clear-sort-btn');
+  if (btn) btn.style.display = sortCol ? '' : 'none';
+}
+
+function clearSort() {
+  sortCol = null; sortDir = 1;
+  document.querySelectorAll('#tbl-head th').forEach(t => t.classList.remove('asc','desc'));
+  updateClearSortBtn();
+  updateClearSortBtn();
+  render_table(getFilteredData());
+}
+
+document.getElementById('tbl-head').addEventListener('click', e => {
+  const th = e.target.closest('th');
+  if (!th) return;
+  const col = th.dataset.col;
+  if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+  document.querySelectorAll('#tbl-head th').forEach(t => t.classList.remove('asc','desc'));
+  th.classList.add(sortDir===1?'asc':'desc');
+  updateClearSortBtn();
+  renderDashboard();
+});
+
+// ═══════════════════════════════════════════════════════════
+// FILTER WIRING
+// ═══════════════════════════════════════════════════════════
+const FILTER_IDS = ['f-owner','f-status','f-state','f-county','f-ava','f-vineyard','f-varietal','f-customer'];
+
+FILTER_IDS.forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    updateFilterOptions();
+    renderDashboard();
+    savePrefs();
+  });
+});
+
+function doReset() {
+  FILTER_IDS.forEach(id => {
+    const sel = document.getElementById(id);
+    Array.from(sel.options).forEach(o => o.selected = o.value === '__all__');
+    // Also reset checkbox lists on touch devices
+    const sfName = id.replace('f-', '');
+    const cl = document.getElementById('cl-' + sfName);
+    if (cl) {
+      cl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = cb.value === '__all__';
+      });
+    }
+  });
+  sortCol = null; sortDir = 1;
+  document.querySelectorAll('#tbl-head th').forEach(t => t.classList.remove('asc','desc'));
+  updateClearSortBtn();
+  // Collapse all open sub-filters
+  SF_ORDER.forEach(name => {
+    const body  = document.getElementById('sf-body-' + name);
+    const arrow = document.getElementById('sf-arrow-' + name);
+    if (body)  body.classList.remove('open');
+    if (arrow) arrow.classList.remove('open');
+  });
+  openSubFilter = null;
+  buildFilters();
+  renderDashboard();
+  try { localStorage.removeItem(PREF_KEY); } catch(e) {}
+}
+document.getElementById('reset-btn-top').addEventListener('click', doReset);
+
+// ═══════════════════════════════════════════════════════════
+// INIT + REFRESH
+// ═══════════════════════════════════════════════════════════
+async function loadData() {
+  try {
+    setProgress(10, 'Authenticating with Microsoft 365…');
+    const token = await getToken();
+
+    setProgress(40, 'Fetching Allocation worksheet…');
+    const values = await fetchSheetData(token);
+
+    setProgress(75, `Parsing ${values.length} rows…`);
+    ALL_DATA = parseRows(values);
+
+    setProgress(90, 'Building dashboard…');
+    buildFilters();
+    restoreFilterSelections();
+    updateFilterOptions();
+    applyInitialVisibility();
+    buildBlockIndex(ALL_DATA);  // index for map lookups
+
+    // Fetch GeoJSON in parallel (non-blocking — map works without it)
+    fetchGeoJSON(token).then(gj => {
+      if (gj) { geojsonData = gj; if (activeTab === 'map') updateMap(); }
+    }).catch(() => {}); // silent — dashboard still works if GeoJSON unavailable
+
+    renderDashboard();
+    updateKpiGrid();
+    initDragDrop();
+
+    const now = new Date();
+    document.getElementById('sync-time').textContent =
+      `Synced ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+
+    setProgress(100, 'Done');
+    setTimeout(hideOverlay, 400);
+
+  } catch (err) {
+    // Classify error for a helpful but non-leaking user message
+    let userMsg;
+    if (err.errorCode === 'popup_window_error' || err.errorCode === 'empty_window_error') {
+      userMsg = 'Login popup was blocked. Please allow popups for this site and try again.';
+    } else if (err.errorCode === 'user_cancelled') {
+      userMsg = 'Sign-in was cancelled. Click Refresh to try again.';
+    } else if (err.message?.includes('No data')) {
+      userMsg = 'No data found in the spreadsheet. Check the Allocation tab has rows.';
+    } else if (err.message?.includes('Graph API error 403')) {
+      userMsg = 'Access denied. Ensure your account has read access to this SharePoint file.';
+    } else if (err.message?.includes('Graph API error 401')) {
+      userMsg = 'Authentication expired. Please refresh and sign in again.';
+    } else if (err.message?.includes('Redirect URI')) {
+      userMsg = 'Configuration error: redirect URI mismatch. Contact your administrator.';
+    } else {
+      userMsg = 'Failed to load dashboard data. Please check your connection and try again.';
+    }
+    showError(userMsg);
+  }
+}
+
+async function refreshData() {
+  const btn = document.getElementById('refresh-btn');
+  const label = btn?.querySelector('.refresh-label');
+
+  // Set spinning state
+  btn?.classList.add('refreshing');
+  btn?.setAttribute('disabled', '');
+  if (label) label.textContent = 'Syncing…';
+
+  try {
+    const token = await getToken();
+    const values = await fetchSheetData(token);
+    ALL_DATA = parseRows(values);
+
+    // Preserve current filter selections — don't call buildFilters()
+    // which would reset everything. Just re-render with existing state.
+    renderDashboard();
+    updateKpiGrid();
+
+    const now = new Date();
+    document.getElementById('sync-time').textContent =
+      `Synced ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+
+    // Brief success flash
+    btn?.classList.remove('refreshing');
+    btn?.classList.add('refresh-ok');
+    if (label) label.textContent = '✓ Synced';
+    setTimeout(() => {
+      btn?.classList.remove('refresh-ok');
+      btn?.removeAttribute('disabled');
+      if (label) label.textContent = 'Refresh';
+    }, 2000);
+
+  } catch (err) {
+    btn?.classList.remove('refreshing');
+    btn?.classList.add('refresh-err');
+    btn?.removeAttribute('disabled');
+    // Classify error same as loadData
+    let userMsg = 'Refresh failed';
+    if (err.errorCode === 'user_cancelled') {
+      userMsg = 'Cancelled';
+    } else if (err.message?.includes('Graph API error 403')) {
+      userMsg = 'Access denied';
+    } else if (err.message?.includes('Graph API error 401')) {
+      userMsg = 'Auth expired';
+    }
+    if (label) label.textContent = userMsg;
+    setTimeout(() => {
+      btn?.classList.remove('refresh-err');
+      if (label) label.textContent = 'Refresh';
+    }, 3000);
+  }
+}
+
+// Diagnostic error handlers — show real detail
+window.onerror = function(msg, src, line, col, err) {
+  const el = document.getElementById('load-error');
+  if (el) { el.style.display = 'block'; el.textContent = 'An unexpected error occurred. Please refresh the page.'; }
+  const st = document.getElementById('load-status');
+  if (st) st.textContent = 'Unexpected error.';
+  return true; // suppress browser default error logging
+};
+window.addEventListener('unhandledrejection', function(e) {
+  const el = document.getElementById('load-error');
+  if (el) { el.style.display = 'block'; el.textContent = 'An unexpected error occurred. Please refresh the page.'; }
+  e.preventDefault(); // suppress console output
+});
+
+// ═══════════════════════════════════════════════════════════
+// MOBILE SIDEBAR
+// ═══════════════════════════════════════════════════════════
+function toggleMobileSidebar() {
+  const sidebar  = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  const isOpen   = sidebar.classList.contains('mobile-open');
+  if (isOpen) {
+    closeMobileSidebar();
+  } else {
+    sidebar.classList.add('mobile-open');
+    backdrop.classList.add('visible');
+    document.querySelectorAll('.hamburger').forEach(b => b.classList.add('open'));
+    document.getElementById('mob-open-btn')?.classList.add('open');
+    document.body.classList.add('sidebar-open');
+  }
+}
+
+function closeMobileSidebar() {
+  const sidebar  = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  sidebar.classList.remove('mobile-open');
+  backdrop.classList.remove('visible');
+  document.querySelectorAll('.hamburger').forEach(b => b.classList.remove('open'));
+  document.getElementById('mob-open-btn')?.classList.remove('open');
+  document.body.classList.remove('sidebar-open');
+}
+
+// iOS scroll lock: intercept touchmove at document level.
+// Allow scroll only when touch is inside the sidebar.
+// This is persistent — survives re-renders unlike class-based approaches.
+document.addEventListener('touchmove', function(e) {
+  if (!document.body.classList.contains('sidebar-open')) return;
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar && sidebar.contains(e.target)) return; // allow sidebar scroll
+  e.preventDefault(); // block everything else
+}, { passive: false });
+
+// Close sidebar on resize to desktop (avoids stuck-open state)
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 768) closeMobileSidebar();
+});
+
+// ═══════════════════════════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════════════════════════
+let activeTab = 'dashboard';
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-dashboard').style.display = tab === 'dashboard' ? 'block' : 'none';
+  document.getElementById('tab-map').style.display       = tab === 'map'       ? 'block' : 'none';
+  document.getElementById('tab-btn-dashboard').classList.toggle('active', tab === 'dashboard');
+  document.getElementById('tab-btn-map').classList.toggle('active', tab === 'map');
+
+  if (tab === 'map') {
+    // Initialise map on first switch (Leaflet needs visible container)
+    if (!mapInstance) {
+      initMap();
+    } else {
+      mapInstance.invalidateSize();
+    }
+    updateMap();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════════════════════════
+let mapInstance    = null;   // Leaflet map
+let geojsonLayer   = null;   // current GeoJSON layer
+let geojsonData    = null;   // raw GeoJSON FeatureCollection
+let blockDataIndex = {};     // blockCode → spreadsheet row(s)
+
+// Colours matching STATUS_COLORS palette
+const MAP_STATUS_COLORS = {
+  'Sold':         { fill: '#3d5c38', border: '#2d4428' },
+  'Open':         { fill: '#b8881e', border: '#8a6616' },
+  'Custom Crush': { fill: '#4a7c9e', border: '#365c76' },
+  'Pending':      { fill: '#7e7060', border: '#5c5246' },
+  'Mothball':     { fill: '#6b1f2a', border: '#4a151d' },
+  'FFC':          { fill: '#8b5e3c', border: '#63432b' },
+};
+const MAP_DEFAULT_COLOR  = { fill: '#aaaaaa', border: '#888888' };
+const MAP_FILTERED_ALPHA = 0.15; // opacity for blocks outside current filter
+
+async function fetchGeoJSON(token) {
+  // Fetch GeoJSON from a different SharePoint site using site-relative path.
+  // Graph API: /sites/{site}/drive/root:/{path}:/content
+  const encodedPath = encodeURIComponent(GEOJSON_PATH).replace(/%2F/g, '/');
+  const url = `https://graph.microsoft.com/v1.0/sites/${GEOJSON_SITE}/drive/root:/${encodedPath}:/content`;
+  const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  if (!resp.ok) throw new Error('GeoJSON fetch failed: ' + resp.status);
+  return await resp.json();
+}
+
+function buildBlockIndex(data) {
+  blockDataIndex = {};
+  data.forEach(d => {
+    const key = (d.blockCode || '').trim().toUpperCase();
+    if (!key) return;
+    if (!blockDataIndex[key]) blockDataIndex[key] = [];
+    blockDataIndex[key].push(d);
+  });
+}
+
+function getBlockStatus(blockCode) {
+  const rows = blockDataIndex[(blockCode || '').trim().toUpperCase()];
+  if (!rows || rows.length === 0) return null;
+  // Prefer Sold > Pending > Custom Crush > Open
+  const priority = ['Sold','Pending','Custom Crush','Open','Mothball','FFC'];
+  for (const s of priority) {
+    if (rows.some(r => r.status === s)) return s;
+  }
+  return rows[0].status;
+}
+
+function isBlockInFilter(blockCode, filteredData) {
+  const key = (blockCode || '').trim().toUpperCase();
+  return filteredData.some(d => (d.blockCode || '').trim().toUpperCase() === key);
+}
+
+function blockPopupHTML(blockCode) {
+  const rows = blockDataIndex[(blockCode || '').trim().toUpperCase()];
+  if (!rows || rows.length === 0) return `<div style="font-family:'DM Mono',monospace;font-size:11px;"><b>${esc(blockCode)}</b><br><span style="color:#7e7060">No data matched</span></div>`;
+
+  const totalTons  = rows.reduce((s,r) => s + r.tons, 0);
+  const totalAcres = rows.reduce((s,r) => s + r.acres, 0);
+  const totalRev   = rows.reduce((s,r) => s + r.revenue, 0);
+  const wtdPPT     = totalTons > 0 ? totalRev / totalTons : 0;
+  const customers  = [...new Set(rows.map(r => r.customer).filter(Boolean))].join(', ');
+  const statuses   = [...new Set(rows.map(r => r.status))].join(', ');
+  const vineyard   = rows[0].vineyard;
+  const block      = rows[0].block;
+  const varietal   = [...new Set(rows.map(r => r.varietal).filter(Boolean))].join(', ');
+
+  return `<div style="font-family:'DM Mono',monospace;font-size:11px;min-width:180px;">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:500;margin-bottom:6px;color:#1c1712;">${esc(vineyard)}</div>
+    <div style="color:#7e7060;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">${esc(block)} · ${esc(varietal)}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:10px;">
+      <tr><td style="color:#7e7060;padding:2px 8px 2px 0;">Acres</td><td style="text-align:right;">${fmtN(totalAcres)}</td></tr>
+      <tr><td style="color:#7e7060;padding:2px 8px 2px 0;">Tons</td><td style="text-align:right;">${fmtN(totalTons)}</td></tr>
+      <tr><td style="color:#7e7060;padding:2px 8px 2px 0;">$/Ton</td><td style="text-align:right;">$${fmtN(wtdPPT)}</td></tr>
+      <tr><td style="color:#7e7060;padding:2px 8px 2px 0;">Revenue</td><td style="text-align:right;">${fmtK(totalRev)}</td></tr>
+      <tr><td style="color:#7e7060;padding:2px 8px 2px 0;">Status</td><td style="text-align:right;">${esc(statuses)}</td></tr>
+      ${customers ? `<tr><td style="color:#7e7060;padding:2px 8px 2px 0;">Customer</td><td style="text-align:right;">${esc(customers)}</td></tr>` : ''}
+    </table>
+  </div>`;
+}
+
+function initMap() {
+  mapInstance = L.map('map', { zoomControl: true, attributionControl: true });
+
+  // Carto light basemap — clean, no API key required
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd', maxZoom: 19
+  }).addTo(mapInstance);
+
+  if (geojsonData) renderGeoJSON(getFilteredData());
+}
+
+function renderGeoJSON(filteredData) {
+  if (!mapInstance || !geojsonData) return;
+  if (geojsonLayer) { geojsonLayer.remove(); geojsonLayer = null; }
+
+  geojsonLayer = L.geoJSON(geojsonData, {
+    style: feature => {
+      const bc     = feature.properties[GEOJSON_BLOCK_FIELD] || '';
+      const status = getBlockStatus(bc);
+      const colors = status ? (MAP_STATUS_COLORS[status] || MAP_DEFAULT_COLOR) : MAP_DEFAULT_COLOR;
+      const inFilter = isBlockInFilter(bc, filteredData);
+      return {
+        fillColor:   colors.fill,
+        color:       colors.border,
+        weight:      1,
+        fillOpacity: inFilter ? 0.75 : MAP_FILTERED_ALPHA,
+        opacity:     inFilter ? 1    : 0.3,
+      };
+    },
+    onEachFeature: (feature, layer) => {
+      const bc = feature.properties[GEOJSON_BLOCK_FIELD] || '';
+      layer.on({
+        mouseover: e => {
+          const rows = blockDataIndex[bc.trim().toUpperCase()];
+          const name = rows?.[0] ? `${rows[0].vineyard} – ${rows[0].block}` : bc;
+          layer.bindTooltip(name, { sticky: true, className: 'map-tooltip' }).openTooltip(e.latlng);
+        },
+        mouseout: () => layer.closeTooltip(),
+        click: e => {
+          layer.bindPopup(blockPopupHTML(bc), { maxWidth: 280 }).openPopup(e.latlng);
+        },
+      });
+    }
+  }).addTo(mapInstance);
+
+  // Fit map to GeoJSON bounds on first load
+  const bounds = geojsonLayer.getBounds();
+  if (bounds.isValid()) mapInstance.fitBounds(bounds, { padding: [20, 20] });
+
+  // Build legend
+  buildMapLegend(filteredData);
+}
+
+function buildMapLegend(filteredData) {
+  const el = document.getElementById('map-legend');
+  if (!el) return;
+  // Only show statuses actually present in filtered data
+  const statuses = [...new Set(filteredData.map(d => d.status))];
+  el.innerHTML = statuses.map(s => {
+    const col = MAP_STATUS_COLORS[s] || MAP_DEFAULT_COLOR;
+    return `<div class="map-legend-item">
+      <div class="map-legend-swatch" style="background:${col.fill};border:1px solid ${col.border};"></div>
+      <span>${esc(s)}</span>
+    </div>`;
+  }).join('');
+}
+
+function updateMap() {
+  if (!mapInstance || !geojsonData) return;
+  renderGeoJSON(getFilteredData());
+}
+
+let flyTimeout = null;
+function flyToBlock(blockCode) {
+  if (!blockCode) return;
+
+  // Switch to map tab
+  switchTab('map');
+
+  if (!geojsonLayer) return;
+
+  // Find the matching layer feature
+  geojsonLayer.eachLayer(layer => {
+    const bc = layer.feature?.properties[GEOJSON_BLOCK_FIELD] || '';
+    if (bc.trim().toUpperCase() !== blockCode.trim().toUpperCase()) return;
+
+    const bounds = layer.getBounds?.();
+    if (bounds?.isValid()) {
+      mapInstance.flyToBounds(bounds, { padding: [60, 60], duration: 0.8 });
+    }
+
+    // Open popup after fly
+    clearTimeout(flyTimeout);
+    flyTimeout = setTimeout(() => {
+      const center = bounds?.getCenter?.() || layer.getLatLng?.();
+      if (center) layer.bindPopup(blockPopupHTML(blockCode), { maxWidth: 280 }).openPopup(center);
+    }, 900);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// PREFERENCE PERSISTENCE (localStorage)
+// ═══════════════════════════════════════════════════════════
+const PREF_KEY = 'kylix_dash_prefs_v1';
+
+function savePrefs() {
+  try {
+    // Collect current filter selections
+    const filters = {};
+    FILTER_IDS.forEach(id => {
+      const sfName = id.replace('f-', '');
+      const sel = IS_TOUCH ? [...getSelectedFromChecklist(sfName)] : 
+        Array.from(document.getElementById(id).selectedOptions)
+          .map(o => o.value).filter(v => v !== '__all__');
+      if (sel.length > 0) filters[sfName] = sel;
+    });
+
+    const prefs = {
+      kpiVisible:   { ...KPI_VISIBLE },
+      chartVisible: { ...CHART_VISIBLE },
+      toggles:      { ...TOGGLES },
+      filters,
+    };
+    localStorage.setItem(PREF_KEY, JSON.stringify(prefs));
+  } catch(e) { /* localStorage unavailable — fail silently */ }
+}
+
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem(PREF_KEY);
+    if (!raw) return;
+    const prefs = JSON.parse(raw);
+
+    // Restore widget visibility
+    if (prefs.kpiVisible) {
+      Object.assign(KPI_VISIBLE, prefs.kpiVisible);
+    }
+    // Restore chart visibility
+    if (prefs.chartVisible) {
+      Object.assign(CHART_VISIBLE, prefs.chartVisible);
+    }
+    // Restore chart toggles
+    if (prefs.toggles) {
+      Object.assign(TOGGLES, prefs.toggles);
+      // Re-apply toggle button active states
+      Object.entries(TOGGLES).forEach(([chart, val]) => {
+        if (chart === 'avaPct') {
+          document.getElementById('tog-ava-pct')?.classList.toggle('active', val);
+        } else {
+          document.querySelectorAll(`[id^="tog-${chart}-"]`).forEach(btn => {
+            btn.classList.toggle('active', btn.id === `tog-${chart}-${val}`);
+          });
+        }
+      });
+    }
+    // Filter selections restored after buildFilters() via restoreFilterSelections()
+    window._savedFilterPrefs = prefs.filters || {};
+  } catch(e) { /* corrupt prefs — ignore */ }
+}
+
+function restoreFilterSelections() {
+  const saved = window._savedFilterPrefs;
+  if (!saved || Object.keys(saved).length === 0) return;
+
+  FILTER_IDS.forEach(id => {
+    const sfName = id.replace('f-', '');
+    const vals = saved[sfName];
+    if (!vals || vals.length === 0) return;
+    const valSet = new Set(vals);
+
+    // Restore native select
+    const sel = document.getElementById(id);
+    let anySelected = false;
+    Array.from(sel.options).forEach(o => {
+      o.selected = valSet.has(o.value);
+      if (o.selected) anySelected = true;
+    });
+    sel.options[0].selected = !anySelected;
+
+    // Restore checkbox list
+    const cl = document.getElementById('cl-' + sfName);
+    if (cl) {
+      const allCb = cl.querySelector('input[value="__all__"]');
+      cl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        if (cb.value === '__all__') return;
+        cb.checked = valSet.has(cb.value);
+        if (cb.checked) anySelected = true;
+      });
+      if (allCb) allCb.checked = !anySelected;
+    }
+  });
+}
+
+// Start
+loadPrefs();   // restore KPI/chart/toggle state before first render
+loadData();
+
+// Auto-refresh every 15 minutes
+setInterval(refreshData, 15 * 60 * 1000);
+</script>
+</body>
+</html>
