@@ -342,7 +342,19 @@ header {
   border-bottom-color: var(--wine);
 }
 #tab-dashboard { display: block; }
-#tab-map       { display: none;  }
+#tab-map {
+  /* Use visibility+absolute instead of display:none so #map always
+     has dimensions — Leaflet needs a sized container to place tiles */
+  visibility: hidden;
+  position: absolute;
+  pointer-events: none;
+  width: 100%;
+}
+#tab-map.tab-visible {
+  visibility: visible;
+  position: relative;
+  pointer-events: auto;
+}
 
 /* ── MAP ── */
 #map-container {
@@ -1064,7 +1076,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard</h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v62</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -3116,7 +3128,7 @@ let activeTab = 'dashboard';
 function switchTab(tab) {
   activeTab = tab;
   document.getElementById('tab-dashboard').style.display = tab === 'dashboard' ? 'block' : 'none';
-  document.getElementById('tab-map').style.display       = tab === 'map'       ? 'block' : 'none';
+  document.getElementById('tab-map').classList.toggle('tab-visible', tab === 'map');
   document.getElementById('tab-btn-dashboard').classList.toggle('active', tab === 'dashboard');
   document.getElementById('tab-btn-map').classList.toggle('active', tab === 'map');
 
