@@ -1093,7 +1093,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v90</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v91</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -1415,9 +1415,9 @@ body.sidebar-open {
     <div id="tab-map">
       <div id="map-container">
         <div id="map"></div>
-        <div style="position:absolute;top:10px;right:10px;z-index:1000;display:flex;gap:6px;">
-          <button class="map-extent-btn" id="map-layer-btn" onclick="toggleMapLayer()" title="Switch base layer">Satellite</button>
+        <div style="position:absolute;bottom:24px;left:10px;z-index:1000;display:flex;flex-direction:column;gap:6px;">
           <button class="map-extent-btn" onclick="zoomToFullExtent()" title="Reset Map">Reset Map</button>
+          <button class="map-extent-btn" id="map-layer-btn" onclick="toggleMapLayer()" title="Switch base layer">Satellite</button>
         </div>
         <div class="map-legend" id="map-legend"></div>
       </div>
@@ -3163,19 +3163,23 @@ function switchTab(tab) {
 
   if (tab === 'map') {
     if (!mapInstance) {
-      // Temporarily disable Leaflet's retina detection before init
       const origRetina = L.Browser.retina;
       L.Browser.retina = false;
       initMap();
       L.Browser.retina = origRetina;
     }
+    // invalidateSize then updateMap synchronously
     mapInstance.invalidateSize({ animate: false });
     updateMap();
-    const bounds = mapInstance._grapeBounds;
-    if (bounds?.isValid()) {
-      mapInstance.fitBounds(bounds, { padding: [20,20], animate: false });
-      delete mapInstance._grapeBounds;
-    }
+    // fitBounds deferred so container is fully painted at correct size
+    setTimeout(() => {
+      const bounds = window._fullExtentBounds || mapInstance._grapeBounds;
+      if (bounds?.isValid()) {
+        mapInstance.invalidateSize({ animate: false }); // second pass after paint
+        mapInstance.fitBounds(bounds, { padding: [20, 20], animate: false });
+        delete mapInstance._grapeBounds;
+      }
+    }, 100);
   }
 }
 
@@ -3579,7 +3583,7 @@ let baseLayer     = null;
 let satelliteLayer = null;
 let isSatellite   = false;
 
-const CARTO_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+const CARTO_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
 const CARTO_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>';
 const ESRI_URL  = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const ESRI_ATTR = 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
@@ -3629,6 +3633,11 @@ function clearSelection() {
 
 function zoomToFullExtent() {
   if (!mapInstance) return;
+  // Close any open popup
+  mapInstance.closePopup();
+  // Clear selected block highlight
+  clearSelection();
+  // Zoom to full extent
   const bounds = window._fullExtentBounds || geojsonLayer?.getBounds();
   if (bounds?.isValid()) mapInstance.fitBounds(bounds, { padding: [20, 20], animate: true });
 }
