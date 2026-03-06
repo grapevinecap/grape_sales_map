@@ -310,6 +310,17 @@ header {
   cursor: pointer; border-radius: 3px; transition: background 0.2s;
 }
 .reset-btn:hover { background: var(--wine-light); }
+/* Compact inline reset button inside filters section head */
+.reset-btn-inline {
+  padding: 2px 7px;
+  background: var(--wine); color: var(--cream); border: none;
+  font-family: 'DM Mono', monospace; font-size: 8px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  cursor: pointer; border-radius: 3px; transition: background 0.2s;
+  white-space: nowrap; flex-shrink: 0;
+  line-height: 1.6;
+}
+.reset-btn-inline:hover { background: var(--wine-light); }
 
 /* ── MAIN CONTENT ── */
 /* Right column: flex column so footer pins to bottom */
@@ -1093,7 +1104,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v99</span></h1>
+      <h1>Grape Sales Dashboard</h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -1149,11 +1160,13 @@ body.sidebar-open {
 
     <!-- Collapsible: Filters (collapsed by default) -->
     <div class="sidebar-section-head collapsible-head" onclick="toggleSection('filters')">
-      <span>Filters</span><span class="collapse-arrow" id="arrow-filters">▲</span>
+      <span>Filters</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button class="reset-btn-inline" id="reset-btn-top" onclick="event.stopPropagation();doReset();">↺ Reset</button>
+        <span class="collapse-arrow" id="arrow-filters">▲</span>
+      </div>
     </div>
     <div class="collapsible-body" id="section-filters">
-      <button class="reset-btn" id="reset-btn-top" style="margin:10px 0 10px;">↺ Reset All Filters</button>
-
       <!-- Sub-filter: Owner -->
       <div class="sf-head" onclick="toggleSubFilter('owner')">
         <span class="sf-label">Owner</span>
@@ -1417,6 +1430,7 @@ body.sidebar-open {
         <div id="map"></div>
         <div style="position:absolute;bottom:24px;left:10px;z-index:1000;display:flex;flex-direction:column;gap:6px;">
           <button class="map-extent-btn" onclick="zoomToFullExtent()" title="Reset Map"><span style="margin-right:5px;font-size:13px;line-height:1;">↺</span>Reset Map</button>
+          <button class="map-extent-btn" onclick="zoomToFiltered()" title="Zoom to Filtered"><span style="margin-right:5px;font-size:13px;line-height:1;">⊕</span>Filtered</button>
           <button class="map-extent-btn" id="map-layer-btn" onclick="toggleMapLayer()" title="Switch base layer">
             <span id="map-layer-swatch" style="display:inline-block;width:18px;height:14px;border-radius:2px;margin-right:6px;border:1px solid rgba(0,0,0,0.2);flex-shrink:0;vertical-align:middle;overflow:hidden;"><img id="map-layer-img" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOCIgaGVpZ2h0PSIxNCIgdmlld0JveD0iMCAwIDE4IDE0Ij48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTQiIGZpbGw9IiMyZDRhMWUiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iOCIgaGVpZ2h0PSI2IiBmaWxsPSIjNDM1ZTJhIi8+PHJlY3QgeD0iOSIgeT0iMCIgd2lkdGg9IjkiIGhlaWdodD0iNSIgZmlsbD0iIzM4NGYyMiIvPjxyZWN0IHg9IjAiIHk9IjciIHdpZHRoPSI3IiBoZWlnaHQ9IjciIGZpbGw9IiM1MTZiMzEiLz48cmVjdCB4PSI4IiB5PSI2IiB3aWR0aD0iMTAiIGhlaWdodD0iOCIgZmlsbD0iIzNkNTUyNSIvPjxyZWN0IHg9IjIiIHk9IjIiIHdpZHRoPSIzIiBoZWlnaHQ9IjIiIGZpbGw9IiM2YjhhM2UiIG9wYWNpdHk9Ii44Ii8+PHJlY3QgeD0iMTEiIHk9IjgiIHdpZHRoPSI0IiBoZWlnaHQ9IjMiIGZpbGw9IiM2YjhhM2UiIG9wYWNpdHk9Ii44Ii8+PHJlY3QgeD0iMSIgeT0iOSIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iIzhhNjA0MCIgb3BhY2l0eT0iLjkiLz48cmVjdCB4PSIxMyIgeT0iMiIgd2lkdGg9IjMiIGhlaWdodD0iMiIgZmlsbD0iIzhhNjA0MCIgb3BhY2l0eT0iLjkiLz48L3N2Zz4=" width="18" height="14" style="display:block;"></span><span id="map-layer-label">Satellite</span>
           </button>
@@ -2957,7 +2971,7 @@ function doReset() {
   renderDashboard();
   try { localStorage.removeItem(PREF_KEY); } catch(e) {}
 }
-document.getElementById('reset-btn-top').addEventListener('click', doReset);
+// reset-btn-top uses onclick="doReset()" directly
 
 // ═══════════════════════════════════════════════════════════
 // INIT + REFRESH
@@ -3656,13 +3670,28 @@ function clearSelection() {
 
 function zoomToFullExtent() {
   if (!mapInstance) return;
-  // Close any open popup
   mapInstance.closePopup();
-  // Clear selected block highlight
   clearSelection();
-  // Zoom to full extent
   const bounds = window._fullExtentBounds || geojsonLayer?.getBounds();
   if (bounds?.isValid()) mapInstance.fitBounds(bounds, { padding: [20, 20], animate: true });
+}
+
+function zoomToFiltered() {
+  if (!mapInstance || !geojsonLayer) return;
+  const filteredData = getFilteredData();
+  const filteredCodes = new Set(filteredData.map(d => (d.blockCode || '').trim().toUpperCase()));
+  // Build bounds from only the filtered polygon layers
+  const filteredBounds = L.latLngBounds();
+  geojsonLayer.eachLayer(layer => {
+    const bc = (layer.feature?.properties[GEOJSON_BLOCK_FIELD] || '').trim().toUpperCase();
+    if (filteredCodes.has(bc)) {
+      const b = layer.getBounds?.();
+      if (b?.isValid()) filteredBounds.extend(b);
+    }
+  });
+  if (filteredBounds.isValid()) {
+    mapInstance.fitBounds(filteredBounds, { padding: [20, 20], animate: true });
+  }
 }
 
 let flyTimeout = null;
