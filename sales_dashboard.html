@@ -356,7 +356,7 @@ header {
   border-bottom-color: var(--wine);
 }
 #tab-dashboard { display: block; }
-#tab-map       { display: none; }  /* controlled by switchTab() */
+#tab-map       { display: none; position: relative; z-index: 0; }  /* z-index:0 keeps map below mobile sidebar (z:150) */
 
 /* ── MAP ── */
 #map-container {
@@ -367,6 +367,7 @@ header {
   border-radius: 3px;
   position: relative;
   overflow: hidden;
+  isolation: isolate; /* creates stacking context — keeps Leaflet layers inside */
 }
 #map {
   height: 100%;
@@ -1072,7 +1073,7 @@ body.sidebar-open {
 }
 /* Popup pane sits above legend (z:1000) and map buttons (z:1000) */
 .leaflet-popup-pane {
-  z-index: 1200 !important;
+  z-index: 1200; /* high within map container stacking context */
 }
 .leaflet-popup-tip { background: white; }
 .map-tooltip {
@@ -1084,8 +1085,8 @@ body.sidebar-open {
 }
 /* Popup: limit width on small screens */
 @media (max-width: 480px) {
-  .leaflet-popup-content-wrapper { max-width: 280px !important; }
-  .leaflet-popup-content { margin: 10px 12px !important; overflow-x: auto; }
+  .leaflet-popup-content-wrapper { max-width: calc(100vw - 40px) !important; }
+  .leaflet-popup-content { margin: 8px 10px !important; }
 }
 /* Suppress Leaflet's blue focus outline on SVG polygon paths */
 .leaflet-container path.leaflet-interactive:focus,
@@ -3530,7 +3531,7 @@ function blockPopupHTML(blockCode) {
   return `<div style="font-family:'DM Mono',monospace;font-size:11px;">
     <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:500;margin-bottom:4px;color:#1c1712;">${esc(vineyard)}</div>
     <div style="color:#7e7060;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px;">${esc(block)} · ${esc(varietal)}</div>
-    <table style="width:100%;border-collapse:collapse;">
+    <table style="width:auto;min-width:100%;border-collapse:collapse;">
       ${headerRow}
       ${dataRows}
     </table>
@@ -3604,7 +3605,8 @@ function renderGeoJSON(filteredData) {
         mouseout: () => layer.closeTooltip(),
         click: e => {
           selectLayer(layer);
-          const popup = L.popup({ maxWidth: 480 })
+          const pw = Math.min(480, window.innerWidth - 40);
+          const popup = L.popup({ maxWidth: pw })
             .setContent(blockPopupHTML(bc))
             .setLatLng(e.latlng);
           popup.on('remove', () => {
@@ -3760,7 +3762,8 @@ function flyToBlock(blockCode) {
       const center = bounds?.getCenter?.();
       if (center) {
         selectLayer(layer);
-        const popup = L.popup({ maxWidth: 480 })
+        const pw2 = Math.min(480, window.innerWidth - 40);
+        const popup = L.popup({ maxWidth: pw2 })
           .setContent(blockPopupHTML(blockCode))
           .setLatLng(center);
         popup.on('remove', () => {
