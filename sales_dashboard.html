@@ -1093,7 +1093,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v96</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v97</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -3594,19 +3594,17 @@ const ESRI_URL  = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Im
 const ESRI_ATTR = 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
 
 function initBaseLayers() {
-  // CartoDB Voyager — crisp, clean street map
-  // detectRetina:true lets CartoDB serve @2x tiles via {r} suffix
+  // tileSize:512 + zoomOffset:-1: requests tiles one zoom level lower,
+  // displays at 512 CSS px. On retina (DPR:2) the browser scales to 256px
+  // logical — same visual size as standard tiles but no upscaling = crisp.
+  // Text stays readable (same size as non-retina) and tiles are sharp.
+  const opts = { tileSize: 512, zoomOffset: -1, detectRetina: false };
+
   baseLayer = L.tileLayer(CARTO_URL, {
-    attribution: CARTO_ATTR,
-    subdomains: 'abcd',
-    maxZoom: 19,
-    detectRetina: true,
+    attribution: CARTO_ATTR, subdomains: 'abcd', maxZoom: 19, ...opts,
   });
-  // ESRI World Imagery satellite
   satelliteLayer = L.tileLayer(ESRI_URL, {
-    attribution: ESRI_ATTR,
-    maxZoom: 19,
-    detectRetina: true,
+    attribution: ESRI_ATTR, maxZoom: 19, ...opts,
   });
   baseLayer.addTo(mapInstance);
 }
