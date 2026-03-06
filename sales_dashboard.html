@@ -376,12 +376,37 @@ header {
   position: absolute; bottom: 24px; right: 8px;
   z-index: 1000;
   background: white; border: 1px solid var(--border);
-  border-radius: 3px; padding: 6px 10px;
+  border-radius: 3px; padding: 0;
   font-family: 'DM Mono', monospace;
   font-size: 10px; letter-spacing: 0.06em;
   box-shadow: var(--shadow-sm);
   max-height: calc(100% - 48px);
+  display: flex; flex-direction: column;
+}
+.map-legend-title {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 10px;
+  cursor: pointer; user-select: none;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: #333; border-bottom: 1px solid rgba(0,0,0,0.08);
+  white-space: nowrap;
+}
+.map-legend-title:hover { background: #f8f8f8; }
+.map-legend-arrow {
+  font-size: 7px; margin-left: 8px;
+  transition: transform 0.2s;
+}
+.map-legend-arrow.open { transform: rotate(180deg); }
+.map-legend-body {
   overflow-y: auto;
+  max-height: 0;
+  transition: max-height 0.25s ease;
+  padding: 0 10px;
+}
+.map-legend-body.open {
+  max-height: 400px;
+  padding: 5px 10px;
 }
 .map-legend-item {
   display: flex; align-items: center; gap: 5px; margin-bottom: 2px;
@@ -927,6 +952,7 @@ body.sidebar-open {
     margin: 0;
     padding: 13px 0;
   }
+
   /* When filters is open, hide the entire Widgets and Charts groups */
   .sidebar.filters-open #section-group-widgets,
   .sidebar.filters-open #section-group-charts {
@@ -1044,6 +1070,10 @@ body.sidebar-open {
   border-radius: 3px;
   box-shadow: 0 2px 12px rgba(28,23,18,0.15);
 }
+/* Popup pane sits above legend (z:1000) and map buttons (z:1000) */
+.leaflet-popup-pane {
+  z-index: 1200 !important;
+}
 .leaflet-popup-tip { background: white; }
 .map-tooltip {
   font-family: 'DM Mono', monospace;
@@ -1051,6 +1081,11 @@ body.sidebar-open {
   background: var(--ink); color: var(--cream);
   border: none; border-radius: 3px;
   padding: 4px 8px;
+}
+/* Popup: limit width on small screens */
+@media (max-width: 480px) {
+  .leaflet-popup-content-wrapper { max-width: 280px !important; }
+  .leaflet-popup-content { margin: 10px 12px !important; overflow-x: auto; }
 }
 /* Suppress Leaflet's blue focus outline on SVG polygon paths */
 .leaflet-container path.leaflet-interactive:focus,
@@ -3593,17 +3628,29 @@ function renderGeoJSON(filteredData) {
 function buildMapLegend(filteredData) {
   const el = document.getElementById('map-legend');
   if (!el) return;
-  // Show varietals present in filtered data, sorted alphabetically
-  // Collapse tier variants into their base varietal for legend display
   const normVarietal = v => v.replace(/\s*-\s*Tier\s*\d+$/i, '').trim();
   const varietals = [...new Set(filteredData.map(d => d.varietal).filter(Boolean).map(normVarietal))].sort();
-  el.innerHTML = varietals.map(v => {
+  // Preserve open/closed state across rebuilds
+  const wasOpen = el.querySelector('.map-legend-body.open') !== null;
+  const items = varietals.map(v => {
     const col = getVarietalColor(v);
     return `<div class="map-legend-item">
       <div class="map-legend-swatch" style="background:${col.fill};border:1px solid ${col.border};"></div>
       <span>${esc(v)}</span>
     </div>`;
   }).join('');
+  el.innerHTML = `
+    <div class="map-legend-title" onclick="toggleMapLegend(this)">
+      Varietals <span class="map-legend-arrow${wasOpen ? ' open' : ''}">▲</span>
+    </div>
+    <div class="map-legend-body${wasOpen ? ' open' : ''}">${items}</div>`;
+}
+
+function toggleMapLegend(titleEl) {
+  const arrow = titleEl.querySelector('.map-legend-arrow');
+  const body  = titleEl.nextElementSibling;
+  const open  = body.classList.toggle('open');
+  arrow.classList.toggle('open', open);
 }
 
 function updateMap() {
