@@ -332,8 +332,8 @@ header {
   border-bottom: 2px solid var(--border);
 }
 .view-tab {
-  font-family: 'DM Mono', monospace;
-  font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 14px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
   padding: 8px 18px; cursor: pointer;
   border: none; background: none;
   color: var(--dust); border-bottom: 2px solid transparent;
@@ -1093,7 +1093,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v94</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v96</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -1418,7 +1418,7 @@ body.sidebar-open {
         <div style="position:absolute;bottom:24px;left:10px;z-index:1000;display:flex;flex-direction:column;gap:6px;">
           <button class="map-extent-btn" onclick="zoomToFullExtent()" title="Reset Map"><span style="margin-right:5px;font-size:13px;line-height:1;">↺</span>Reset Map</button>
           <button class="map-extent-btn" id="map-layer-btn" onclick="toggleMapLayer()" title="Switch base layer">
-            <span id="map-layer-swatch" style="display:inline-block;width:18px;height:14px;border-radius:2px;margin-right:6px;border:1px solid rgba(0,0,0,0.2);flex-shrink:0;background:linear-gradient(135deg,#4a7c9e 0%,#2d5a3d 50%,#8b7355 100%);vertical-align:middle;"></span><span id="map-layer-label">Satellite</span>
+            <span id="map-layer-swatch" style="display:inline-block;width:18px;height:14px;border-radius:2px;margin-right:6px;border:1px solid rgba(0,0,0,0.2);flex-shrink:0;vertical-align:middle;overflow:hidden;"><img id="map-layer-img" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOCIgaGVpZ2h0PSIxNCIgdmlld0JveD0iMCAwIDE4IDE0Ij48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTQiIGZpbGw9IiMyZDRhMWUiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iOCIgaGVpZ2h0PSI2IiBmaWxsPSIjNDM1ZTJhIi8+PHJlY3QgeD0iOSIgeT0iMCIgd2lkdGg9IjkiIGhlaWdodD0iNSIgZmlsbD0iIzM4NGYyMiIvPjxyZWN0IHg9IjAiIHk9IjciIHdpZHRoPSI3IiBoZWlnaHQ9IjciIGZpbGw9IiM1MTZiMzEiLz48cmVjdCB4PSI4IiB5PSI2IiB3aWR0aD0iMTAiIGhlaWdodD0iOCIgZmlsbD0iIzNkNTUyNSIvPjxyZWN0IHg9IjIiIHk9IjIiIHdpZHRoPSIzIiBoZWlnaHQ9IjIiIGZpbGw9IiM2YjhhM2UiIG9wYWNpdHk9Ii44Ii8+PHJlY3QgeD0iMTEiIHk9IjgiIHdpZHRoPSI0IiBoZWlnaHQ9IjMiIGZpbGw9IiM2YjhhM2UiIG9wYWNpdHk9Ii44Ii8+PHJlY3QgeD0iMSIgeT0iOSIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iIzhhNjA0MCIgb3BhY2l0eT0iLjkiLz48cmVjdCB4PSIxMyIgeT0iMiIgd2lkdGg9IjMiIGhlaWdodD0iMiIgZmlsbD0iIzhhNjA0MCIgb3BhY2l0eT0iLjkiLz48L3N2Zz4=" width="18" height="14" style="display:block;"></span><span id="map-layer-label">Satellite</span>
           </button>
         </div>
         <div class="map-legend" id="map-legend"></div>
@@ -3170,10 +3170,7 @@ function switchTab(tab) {
   if (tab === 'map') {
     const firstInit = !mapInstance;
     if (firstInit) {
-      const origRetina = L.Browser.retina;
-      L.Browser.retina = false;
       initMap();
-      L.Browser.retina = origRetina;
     }
     mapInstance.invalidateSize({ animate: false });
     updateMap(); // this sets window._fullExtentBounds via renderGeoJSON
@@ -3509,8 +3506,8 @@ function initMap() {
     return pos;
   };
 
+  mapInstance.setView([38.5, -122.8], 10); // fallback; overridden by fitBounds
   initBaseLayers();
-  // View will be set by fitBounds once GeoJSON loads — no default setView
 
   if (geojsonData) renderGeoJSON(getFilteredData());
 }
@@ -3591,47 +3588,45 @@ let baseLayer     = null;
 let satelliteLayer = null;
 let isSatellite   = false;
 
-const CARTO_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
+const CARTO_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 const CARTO_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>';
 const ESRI_URL  = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const ESRI_ATTR = 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
 
 function initBaseLayers() {
-  // Use OSM for street map — simple, no retina complications,
-  // sharp at all zoom levels regardless of devicePixelRatio
-  baseLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  // CartoDB Voyager — crisp, clean street map
+  // detectRetina:true lets CartoDB serve @2x tiles via {r} suffix
+  baseLayer = L.tileLayer(CARTO_URL, {
+    attribution: CARTO_ATTR,
+    subdomains: 'abcd',
     maxZoom: 19,
-    maxNativeZoom: 19,
+    detectRetina: true,
   });
-  // ESRI satellite — also straightforward, no retina variant needed
+  // ESRI World Imagery satellite
   satelliteLayer = L.tileLayer(ESRI_URL, {
     attribution: ESRI_ATTR,
     maxZoom: 19,
-    maxNativeZoom: 19,
+    detectRetina: true,
   });
   baseLayer.addTo(mapInstance);
 }
-
-// Swatch styles: shows preview of the layer you'll switch TO
-const SWATCH_SATELLITE = 'linear-gradient(135deg,#4a7c9e 0%,#2d5a3d 50%,#8b7355 100%)'; // earthy satellite look
-const SWATCH_STREET    = 'linear-gradient(135deg,#e8e0d5 0%,#d4c9b8 40%,#c8bfb0 100%)'; // pale road-map look
 
 function toggleMapLayer() {
   if (!mapInstance) return;
   const label  = document.getElementById('map-layer-label');
   const swatch = document.getElementById('map-layer-swatch');
+  const img = document.getElementById('map-layer-img');
   if (isSatellite) {
     mapInstance.removeLayer(satelliteLayer);
     baseLayer.addTo(mapInstance);
-    if (label)  label.textContent   = 'Satellite';
-    if (swatch) swatch.style.background = SWATCH_SATELLITE;
+    if (label) label.textContent = 'Satellite';
+    if (img)   img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOCIgaGVpZ2h0PSIxNCIgdmlld0JveD0iMCAwIDE4IDE0Ij48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTQiIGZpbGw9IiMyZDRhMWUiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iOCIgaGVpZ2h0PSI2IiBmaWxsPSIjNDM1ZTJhIi8+PHJlY3QgeD0iOSIgeT0iMCIgd2lkdGg9IjkiIGhlaWdodD0iNSIgZmlsbD0iIzM4NGYyMiIvPjxyZWN0IHg9IjAiIHk9IjciIHdpZHRoPSI3IiBoZWlnaHQ9IjciIGZpbGw9IiM1MTZiMzEiLz48cmVjdCB4PSI4IiB5PSI2IiB3aWR0aD0iMTAiIGhlaWdodD0iOCIgZmlsbD0iIzNkNTUyNSIvPjxyZWN0IHg9IjIiIHk9IjIiIHdpZHRoPSIzIiBoZWlnaHQ9IjIiIGZpbGw9IiM2YjhhM2UiIG9wYWNpdHk9Ii44Ii8+PHJlY3QgeD0iMTEiIHk9IjgiIHdpZHRoPSI0IiBoZWlnaHQ9IjMiIGZpbGw9IiM2YjhhM2UiIG9wYWNpdHk9Ii44Ii8+PHJlY3QgeD0iMSIgeT0iOSIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iIzhhNjA0MCIgb3BhY2l0eT0iLjkiLz48cmVjdCB4PSIxMyIgeT0iMiIgd2lkdGg9IjMiIGhlaWdodD0iMiIgZmlsbD0iIzhhNjA0MCIgb3BhY2l0eT0iLjkiLz48L3N2Zz4=';
     isSatellite = false;
   } else {
     mapInstance.removeLayer(baseLayer);
     satelliteLayer.addTo(mapInstance);
-    if (label)  label.textContent   = 'Street Map';
-    if (swatch) swatch.style.background = SWATCH_STREET;
+    if (label) label.textContent = 'Street Map';
+    if (img)   img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOCIgaGVpZ2h0PSIxNCIgdmlld0JveD0iMCAwIDE4IDE0Ij48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTQiIGZpbGw9IiNlOGU0ZDgiLz48cmVjdCB4PSIwIiB5PSI1IiB3aWR0aD0iMTgiIGhlaWdodD0iMiIgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iLjkiLz48cmVjdCB4PSIwIiB5PSI5IiB3aWR0aD0iMTgiIGhlaWdodD0iMS4yIiBmaWxsPSIjZDBjOGI4Ii8+PHJlY3QgeD0iNyIgeT0iMCIgd2lkdGg9IjIiIGhlaWdodD0iMTQiIGZpbGw9IiNmZmYiIG9wYWNpdHk9Ii45Ii8+PHJlY3QgeD0iMTMiIHk9IjAiIHdpZHRoPSIxLjIiIGhlaWdodD0iMTQiIGZpbGw9IiNkMGM4YjgiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iNSIgaGVpZ2h0PSI0IiBmaWxsPSIjYzhkNGIwIiBvcGFjaXR5PSIuNyIvPjxyZWN0IHg9IjEwIiB5PSI4IiB3aWR0aD0iNiIgaGVpZ2h0PSI2IiBmaWxsPSIjYzhkNGIwIiBvcGFjaXR5PSIuNyIvPjwvc3ZnPg==';
     isSatellite = true;
   }
   if (geojsonLayer) geojsonLayer.bringToFront();
