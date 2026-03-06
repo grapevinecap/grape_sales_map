@@ -1093,7 +1093,7 @@ body.sidebar-open {
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v98</span></h1>
+      <h1>Grape Sales Dashboard <span style="font-size:11px;opacity:0.4;font-family:'DM Mono',monospace;font-weight:300;letter-spacing:0.05em;">v99</span></h1>
       <div class="subtitle">2026 Vintage</div>
     </div>
   </div>
@@ -2984,7 +2984,18 @@ async function loadData() {
     Promise.resolve().then(() => fetchGeoJSON(token)).then(gj => {
       if (gj) {
         geojsonData = gj;
-        if (activeTab === 'map' && mapInstance) updateMap();
+        if (activeTab === 'map' && mapInstance) {
+          updateMap(); // sets window._fullExtentBounds synchronously
+          // fitBounds after next paint — map tab is already visible
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            const bounds = window._fullExtentBounds || geojsonLayer?.getBounds();
+            if (bounds?.isValid()) {
+              mapInstance.invalidateSize({ animate: false });
+              mapInstance.fitBounds(bounds, { padding: [20, 20], animate: true });
+              window._mapExtentFitted = true;
+            }
+          }));
+        }
       }
     }).catch(err => {
       // Store error message — shown when user switches to map tab
@@ -3173,18 +3184,17 @@ function switchTab(tab) {
       initMap();
     }
     mapInstance.invalidateSize({ animate: false });
-    updateMap(); // synchronously sets window._fullExtentBounds via renderGeoJSON
-    if (!window._flyToBlockPending) {
-      // fitBounds in next frame — container is fully sized, bounds are set
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          mapInstance.invalidateSize({ animate: false });
-          const bounds = window._fullExtentBounds || geojsonLayer?.getBounds();
-          if (bounds?.isValid()) {
-            mapInstance.fitBounds(bounds, { padding: [20, 20], animate: false });
-          }
-        });
-      });
+    updateMap();
+    if (!window._flyToBlockPending && !window._mapExtentFitted) {
+      // First switch to map: fit to full extent
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        mapInstance.invalidateSize({ animate: false });
+        const bounds = window._fullExtentBounds || geojsonLayer?.getBounds();
+        if (bounds?.isValid()) {
+          mapInstance.fitBounds(bounds, { padding: [20, 20], animate: false });
+          window._mapExtentFitted = true;
+        }
+      }));
     }
     window._flyToBlockPending = false;
   }
