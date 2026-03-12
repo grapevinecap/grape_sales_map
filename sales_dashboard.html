@@ -25,7 +25,8 @@
     https://*.tile.openstreetmap.org
     https://*.basemaps.cartocdn.com
     https://server.arcgisonline.com
-    https://us57.vintrace.net;
+    https://us57.vintrace.net
+    https://bulk-wine.newhall.workers.dev;
   img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.cartocdn.com https://server.arcgisonline.com;
   frame-src https://login.microsoftonline.com;
   frame-ancestors 'none';
@@ -174,24 +175,6 @@ header {
 .refresh-btn.refresh-err { border-color: #f87171; color: #f87171; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .refresh-icon { display: inline-block; }
-
-/* ── MODE TOGGLE ── */
-.mode-toggle {
-  display: flex; gap: 6px; align-items: center;
-  padding: 0 16px;
-}
-.mode-btn {
-  padding: 6px 14px;
-  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-  color: rgba(255,255,255,0.5); font-family: 'DM Mono', monospace;
-  font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
-  border-radius: 3px; cursor: pointer; transition: all 0.2s;
-}
-.mode-btn:hover { border-color: var(--gold-light); color: var(--gold-light); }
-.mode-btn.active {
-  background: var(--wine); border-color: var(--wine);
-  color: var(--cream); font-weight: 500;
-}
 
 /* ── LAYOUT ── */
 .app-body { display: grid; grid-template-columns: 252px 1fr; grid-template-rows: 1fr; align-items: stretch; flex: 1; min-height: 0; overflow: hidden; }
@@ -358,16 +341,6 @@ header {
   flex: 1;            /* grows to fill space above footer */
   min-height: 0;      /* required for flex overflow to work */
 }
-
-/* ── MODE-SPECIFIC DISPLAY ── */
-#sidebar { display: flex; }
-#bw-sidebar { display: none; }
-.main-col { display: flex; }
-#bw-main-col { display: none; }
-body.bulk-wine-mode #sidebar { display: none; }
-body.bulk-wine-mode #bw-sidebar { display: flex; }
-body.bulk-wine-mode .main-col { display: none; }
-body.bulk-wine-mode #bw-main-col { display: flex; }
 
 /* ── TAB SWITCHER ── */
 .view-tabs {
@@ -1170,6 +1143,24 @@ body.sidebar-open {
   white-space: nowrap;
 }
 .map-extent-btn:hover { background: #f4f4f4; }
+
+/* ── MODE TOGGLE ── */
+.mode-toggle { display:flex;gap:6px;margin-left:auto; }
+.mode-btn {
+  padding:6px 16px;border-radius:20px;border:1px solid var(--border);
+  background:transparent;color:var(--dust);font:600 11px/1 'DM Mono',monospace;
+  cursor:pointer;transition:all .2s;letter-spacing:0.5px;
+}
+.mode-btn.active { background:var(--wine);color:var(--cream);border-color:var(--wine); }
+.mode-btn:hover:not(.active) { border-color:var(--gold);color:var(--ink); }
+
+/* ── BULK WINE MODE ── */
+#bw-sidebar { display: none; }
+#bw-main-col { display: none; }
+body.bulk-wine-mode #sidebar { display: none; }
+body.bulk-wine-mode #bw-sidebar { display: flex; }
+body.bulk-wine-mode .main-col { display: none; }
+body.bulk-wine-mode #bw-main-col { display: flex; }
 </style>
 </head>
 <body>
@@ -1205,14 +1196,14 @@ body.sidebar-open {
       <div class="subtitle" id="header-subtitle">2026 Vintage</div>
     </div>
   </div>
-  <div class="mode-toggle">
-    <button class="mode-btn active" id="mode-grape" onclick="switchMode('grape')">Grape Sales</button>
-    <button class="mode-btn" id="mode-wine" onclick="switchMode('wine')">Bulk Wine</button>
-  </div>
   <div class="header-right">
     <div class="live-badge"><span class="live-dot"></span><span id="live-badge-text">Live · SharePoint</span></div>
     <div class="sync-time" id="sync-time">—</div>
     <button class="refresh-btn" id="refresh-btn" onclick="refreshData()"><span class="refresh-icon">↺</span> <span class="refresh-label">Refresh</span></button>
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="mode-grape" onclick="switchMode('grape')">Grape Sales</button>
+      <button class="mode-btn" id="mode-wine" onclick="switchMode('wine')">Bulk Wine</button>
+    </div>
   </div>
 </header>
 <!-- Mobile sidebar overlay backdrop -->
@@ -1352,115 +1343,76 @@ body.sidebar-open {
     </div>
   </aside>
 
-  <!-- BULK WINE SIDEBAR -->
-  <aside class="sidebar" id="bw-sidebar">
-    <div class="sidebar-head">
-      <span>Customize</span>
-      <button class="hamburger hamburger-fixed" id="hamburger-fixed-bw" onclick="toggleMobileSidebar()" aria-label="Close filters">
-        <span></span><span></span><span></span>
-      </button>
+<!-- ═══ BULK WINE SIDEBAR ═══ -->
+<aside class="sidebar" id="bw-sidebar">
+  <!-- Widgets section -->
+  <div class="sidebar-section">
+    <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="section-title">Widgets</span>
+      <span class="section-chevron">▾</span>
     </div>
+    <div class="section-body">
+      <button class="vis-btn active" id="vis-bw-vol" onclick="toggleWidgetBW('vol')">Volume</button>
+      <button class="vis-btn active" id="vis-bw-vessels" onclick="toggleWidgetBW('vessels')">Vessels</button>
+      <button class="vis-btn active" id="vis-bw-cost" onclick="toggleWidgetBW('cost')">Cost/Gal</button>
+      <button class="vis-btn active" id="vis-bw-var" onclick="toggleWidgetBW('var')">Varieties</button>
+      <button class="vis-btn active" id="vis-bw-owner" onclick="toggleWidgetBW('owner')">Top Owner</button>
+    </div>
+  </div>
 
-    <!-- Collapsible: Widgets -->
-    <div id="section-group-widgets-bw">
-    <div class="sidebar-section-head collapsible-head" onclick="toggleSection('widgets-bw')" style="border-top:none;">
-      <span>Widgets</span><span class="collapse-arrow" id="arrow-widgets-bw">▲</span>
+  <!-- Charts section -->
+  <div class="sidebar-section">
+    <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="section-title">Charts</span>
+      <span class="section-chevron">▾</span>
     </div>
-    <div class="collapsible-body" id="section-widgets-bw">
-      <button class="vis-btn" id="vis-bw-vol"     onclick="toggleWidgetBW('vol')">    <span class="vis-dot"></span>Total Volume</button>
-      <button class="vis-btn" id="vis-bw-vessels" onclick="toggleWidgetBW('vessels')"><span class="vis-dot"></span>Total Vessels</button>
-      <button class="vis-btn" id="vis-bw-cost"    onclick="toggleWidgetBW('cost')">   <span class="vis-dot"></span>Avg Cost/Gal</button>
-      <button class="vis-btn" id="vis-bw-var"     onclick="toggleWidgetBW('var')">    <span class="vis-dot"></span>Unique Varieties</button>
-      <button class="vis-btn" id="vis-bw-owner"   onclick="toggleWidgetBW('owner')">  <span class="vis-dot"></span>Top Owner</button>
+    <div class="section-body">
+      <button class="vis-btn active" id="vis-bw-var-chart" onclick="toggleChartBW('var-chart')">Variety</button>
+      <button class="vis-btn active" id="vis-bw-owner-chart" onclick="toggleChartBW('owner-chart')">Owner</button>
+      <button class="vis-btn active" id="vis-bw-subava-chart" onclick="toggleChartBW('subava-chart')">Sub AVA</button>
+      <button class="vis-btn active" id="vis-bw-vintage-chart" onclick="toggleChartBW('vintage-chart')">Vintage</button>
+      <button class="vis-btn active" id="vis-bw-alloc-chart" onclick="toggleChartBW('alloc-chart')">Allocation</button>
+      <button class="vis-btn active" id="vis-bw-grade-chart" onclick="toggleChartBW('grade-chart')">Grading</button>
     </div>
-    </div>
+  </div>
 
-    <!-- Collapsible: Charts -->
-    <div id="section-group-charts-bw">
-    <div class="sidebar-section-head collapsible-head" onclick="toggleSection('charts-bw')">
-      <span>Charts</span><span class="collapse-arrow" id="arrow-charts-bw">▲</span>
+  <!-- Filters section -->
+  <div class="sidebar-section">
+    <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="section-title">Filters</span>
+      <span class="section-chevron">▾</span>
     </div>
-    <div class="collapsible-body" id="section-charts-bw">
-      <button class="vis-btn" id="vis-bw-var-chart"     onclick="toggleChartBW('var-chart')">     <span class="vis-dot"></span>Volume by Variety</button>
-      <button class="vis-btn" id="vis-bw-owner-chart"   onclick="toggleChartBW('owner-chart')">   <span class="vis-dot"></span>Volume by Owner</button>
-      <button class="vis-btn" id="vis-bw-subava-chart"  onclick="toggleChartBW('subava-chart')">  <span class="vis-dot"></span>Volume by Sub AVA</button>
-      <button class="vis-btn" id="vis-bw-vintage-chart" onclick="toggleChartBW('vintage-chart')"> <span class="vis-dot"></span>Volume by Vintage</button>
-      <button class="vis-btn" id="vis-bw-alloc-chart"   onclick="toggleChartBW('alloc-chart')">   <span class="vis-dot"></span>Brand Allocation</button>
-      <button class="vis-btn" id="vis-bw-grade-chart"   onclick="toggleChartBW('grade-chart')">   <span class="vis-dot"></span>Volume by Grading</button>
-    </div>
-    </div>
-
-    <!-- Collapsible: Filters -->
-    <div class="sidebar-section-head collapsible-head" onclick="toggleSection('filters-bw')">
-      <span>Filters</span>
-      <div style="display:flex;align-items:center;gap:0;">
-        <button class="reset-btn-inline" id="reset-btn-top-bw" onclick="event.stopPropagation();doResetBW();"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAAAFwUlEQVR42sVXS4sc1xU+t6u6W9OjmdHD0jiOmDgiJsKGwCQ4yiKRx8tAMGQhkiyMF84i2WjhjTcGQX6CYhIwGILBWYxJMAMxZBE0EsE4ouVBQw+taXke1dNdj+6ud93qet7Pi+ke2mNZre5JyIGCou69537n3O+e8xXRlAZAov+HAWAACkREew83r3iqemH4fRp/hUmjZoyBMSacbut3i889ey+g4MJg+H8HYBC1zBjLa7X/POs7+kcLz1z4s8jzOadjZ1hdlaYFMNZWD50TEVFX330tCswDIELoGpnba2d37tz51leB3panPY5vtLW1tYprq7fyxEcW2QhsLe17HQS2lnfa+7/t6Qc/UZT6c9OQlD0p7URU6LSVq6fnZ9+tzC0sh64liIgYY0dHN1OpUJ5llKSJJwTbhMg/OnjU/PDFq1fNAVnBGMNEEd+8ebMAgO3V688Hjm4BQGBrfe7oInQNjD7cMdLQNRLu6AKpDyBB3zfbXVX5/bFgprpuTFMevRQ4xjqQInQNEdhaPgogjxwAIYAICe8hsLUoCU0ACXxLW11bW6s8CQQbB2KQvoLdbd+szM68U5LlAuc8kyRJzvJc8DB8vSgVIZeka0VJ/sXM/JlLfc8BhEgrZy6WPMtY/3xz++crKyvJVMcBoDBEr+42Xgn9Xh2IEbpG7pntrF6/f0S+jY2NM46lvhNxM077NgJbjQAB21A+PHH1BCATEX32ySfzrqW9BxGi73dx8MXWC7dv35YBlIZz1eb2tYibZhJagjt6DCTo6Hu/+W+AOFpsasqvQrejKcrWS6OZQq1WIiJq7m5di0M76XudNIvd3LdUpVqtVobcOmkvkIiItjc+/XatVjt3nGS1AYiutvcHIAZ39AiI0FV3Xx/N5kmbkjSuYTUan80Htt6Jg16OnAun1/rH2GMYpuhp0jSsF08CaBrK+0CEyO/Cs9pGrVY7fZLuORFpAbCeobwBROCOnnFHF+p+48UhZ4iI5OPR37p144jNN27cSCa+tyPuGGNo7T9sIY2JMYZyucx4MT7/tRo07HitvcZy3+sovqXuJNxSlJ3tn017dYZrDvbqr4rYRegaqYhdWGrzldHxAhHR9evXQUQkSYW0VCotnTpVvlysnFmanTn1XRwinfi81tfXGRGx8qnyRVYsEhFRksTE874zxDgqSEBE5Ku9Zsh5N8syQRRDkgsvs8HYpLayskJEBLkgXyUmESOSkjR1Xdc8GN3zKyWXiMjttf+FLBAJN4VvqUqj0SiPluNJdGO1Wi16ZnsnDS2B1Bdur3V3dK/jkqxARJTn+d9IKrE0SZPTZ88tLVSkNxlj4jhhx5jMGBOXLi68MXfu/OUkSRKSyyzN8r9/oxQcRtis1c4FtmYmoZXF3Mz6Qc9+VLv/vcM51eL46A/n1Osbz/eDXm/oJ3A0p9H4/MkK+qh46MpbQIbA1iKR+uBe5+Hu7tZ3jmr+YfMpjBSt4TeJiKjx4MGl0OvWRBogsLUIyGFqytvjqyARAyCtrq5KTq91F0gQWGqELEAUmK2e3vzluAx0deW1vt9tIgsO1yKG12t/OuiY0vHo2eP6PxFhf39rcfGZxbszp+de4LYVl2dmyrIsUxDwO7kQf4378T3TMw0iovPzc4tyufLjcrH460ql8qrIc4r6/Xj27Nly6Af7La310ytXftgWQhQGfBovQoiIdmrVJe527wMZuKPnia0lyAIAEfpeB77VDnxb9fteB0AEZAG4rSXc0TMgA/e6D7Y3710+zvynVkJERP/84INZz9b/GHErA2JEfhfc0RPuGOlApIrBexL5XQAxIm7lvq3/6d8ffzw31ebHQRARqcoXP/I94/3Q7egi8QDEAJLBEwOJh9DtGL6j/0Vt7rz8OB8Ti9LR/wPGWE5EtFOtLswtXfhBkdj3i3LpIhWI0jzvpHneaLfNzeXlZWeE7eIEzeyx4lR6miY0Scq/BMGP147sdWg4AAAAAElFTkSuQmCC" width="11" height="11" style="flex-shrink:0;" alt="reset">Reset</button>
-        <span style="display:inline-block;width:14px;"></span>
-        <span class="collapse-arrow" id="arrow-filters-bw">▲</span>
+    <div class="section-body">
+      <div class="sf-group"><label class="sf-label">Owner</label>
+        <select id="f-bw-owner" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Owners</option></select>
+        <div class="sf-checklist" id="cl-bw-owner"><label class="all-option"><input type="checkbox" id="cl-bw-owner-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-owner')"> All Owners</label></div>
       </div>
-    </div>
-    <div class="collapsible-body" id="section-filters-bw">
-      <!-- Sub-filter: Owner -->
-      <div class="sf-head" onclick="toggleSubFilter('bw-owner')">
-        <span class="sf-label">Owner</span>
-        <span class="sf-arrow" id="sf-arrow-bw-owner">▲</span>
+      <div class="sf-group"><label class="sf-label">Variety</label>
+        <select id="f-bw-variety" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Varieties</option></select>
+        <div class="sf-checklist" id="cl-bw-variety"><label class="all-option"><input type="checkbox" id="cl-bw-variety-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-variety')"> All Varieties</label></div>
       </div>
-      <div class="sf-body" id="sf-body-bw-owner">
-        <select id="f-bw-owner" multiple><option value="__all__" selected>All Owners</option></select>
-        <div class="sf-checklist" id="cl-bw-owner"><label class="all-option"><input type="checkbox" id="cl-bw-owner-all" value="__all__" checked> All Owners</label></div>
+      <div class="sf-group"><label class="sf-label">Vintage</label>
+        <select id="f-bw-vintage" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Vintages</option></select>
+        <div class="sf-checklist" id="cl-bw-vintage"><label class="all-option"><input type="checkbox" id="cl-bw-vintage-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-vintage')"> All Vintages</label></div>
       </div>
-
-      <!-- Sub-filter: Variety -->
-      <div class="sf-head" onclick="toggleSubFilter('bw-variety')">
-        <span class="sf-label">Variety</span>
-        <span class="sf-arrow" id="sf-arrow-bw-variety">▲</span>
+      <div class="sf-group"><label class="sf-label">Sub AVA</label>
+        <select id="f-bw-subava" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Sub AVAs</option></select>
+        <div class="sf-checklist" id="cl-bw-subava"><label class="all-option"><input type="checkbox" id="cl-bw-subava-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-subava')"> All Sub AVAs</label></div>
       </div>
-      <div class="sf-body" id="sf-body-bw-variety">
-        <select id="f-bw-variety" multiple><option value="__all__" selected>All Varieties</option></select>
-        <div class="sf-checklist" id="cl-bw-variety"><label class="all-option"><input type="checkbox" id="cl-bw-variety-all" value="__all__" checked> All Varieties</label></div>
+      <div class="sf-group"><label class="sf-label">Grading</label>
+        <select id="f-bw-grading" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Gradings</option></select>
+        <div class="sf-checklist" id="cl-bw-grading"><label class="all-option"><input type="checkbox" id="cl-bw-grading-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-grading')"> All Gradings</label></div>
       </div>
-
-      <!-- Sub-filter: Vintage -->
-      <div class="sf-head" onclick="toggleSubFilter('bw-vintage')">
-        <span class="sf-label">Vintage</span>
-        <span class="sf-arrow" id="sf-arrow-bw-vintage">▲</span>
+      <div class="sf-group"><label class="sf-label">Tax State</label>
+        <select id="f-bw-taxstate" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Tax States</option></select>
+        <div class="sf-checklist" id="cl-bw-taxstate"><label class="all-option"><input type="checkbox" id="cl-bw-taxstate-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-taxstate')"> All Tax States</label></div>
       </div>
-      <div class="sf-body" id="sf-body-bw-vintage">
-        <select id="f-bw-vintage" multiple><option value="__all__" selected>All Vintages</option></select>
-        <div class="sf-checklist" id="cl-bw-vintage"><label class="all-option"><input type="checkbox" id="cl-bw-vintage-all" value="__all__" checked> All Vintages</label></div>
-      </div>
-
-      <!-- Sub-filter: Sub AVA -->
-      <div class="sf-head" onclick="toggleSubFilter('bw-subava')">
-        <span class="sf-label">Sub AVA</span>
-        <span class="sf-arrow" id="sf-arrow-bw-subava">▲</span>
-      </div>
-      <div class="sf-body" id="sf-body-bw-subava">
-        <select id="f-bw-subava" multiple><option value="__all__" selected>All Sub AVAs</option></select>
-        <div class="sf-checklist" id="cl-bw-subava"><label class="all-option"><input type="checkbox" id="cl-bw-subava-all" value="__all__" checked> All Sub AVAs</label></div>
-      </div>
-
-      <!-- Sub-filter: Grading -->
-      <div class="sf-head" onclick="toggleSubFilter('bw-grading')">
-        <span class="sf-label">Grading</span>
-        <span class="sf-arrow" id="sf-arrow-bw-grading">▲</span>
-      </div>
-      <div class="sf-body" id="sf-body-bw-grading">
-        <select id="f-bw-grading" multiple><option value="__all__" selected>All Gradings</option></select>
-        <div class="sf-checklist" id="cl-bw-grading"><label class="all-option"><input type="checkbox" id="cl-bw-grading-all" value="__all__" checked> All Gradings</label></div>
-      </div>
-
-      <!-- Sub-filter: Tax State -->
-      <div class="sf-head" onclick="toggleSubFilter('bw-taxstate')">
-        <span class="sf-label">Tax State</span>
-        <span class="sf-arrow" id="sf-arrow-bw-taxstate">▲</span>
-      </div>
-      <div class="sf-body" id="sf-body-bw-taxstate">
-        <select id="f-bw-taxstate" multiple><option value="__all__" selected>All Tax States</option></select>
-        <div class="sf-checklist" id="cl-bw-taxstate"><label class="all-option"><input type="checkbox" id="cl-bw-taxstate-all" value="__all__" checked> All Tax States</label></div>
+      <div style="text-align:center;margin-top:10px;">
+        <button onclick="doResetBW()" style="background:var(--wine);color:var(--cream);border:none;padding:8px 20px;border-radius:20px;cursor:pointer;font:600 11px/1 'DM Mono',monospace;">Reset Filters</button>
       </div>
     </div>
-  </aside>
+  </div>
+</aside>
 
   <!-- MAIN COLUMN: content + footer, scrolls independently -->
   <div class="main-col">
@@ -1701,172 +1653,114 @@ body.sidebar-open {
   </footer>
   </div><!-- /.main-col -->
 
-  <!-- BULK WINE MAIN COLUMN -->
-  <div class="main-col" id="bw-main-col">
-  <main class="content" id="bw-main-content">
+<!-- ═══ BULK WINE MAIN CONTENT ═══ -->
+<div class="main-col" id="bw-main-col">
+<main class="content" id="bw-main-content">
 
-    <!-- Error banner (hidden by default) -->
-    <div id="bw-error-banner" style="display:none;background:#6b1f2a;color:#f5f0e8;padding:16px 20px;border-radius:12px;margin-bottom:16px;font-size:13px;line-height:1.5;"></div>
+  <!-- Error banner (hidden by default) -->
+  <div id="bw-error-banner" style="display:none;background:#6b1f2a;color:#f5f0e8;padding:16px 20px;border-radius:12px;margin-bottom:16px;font-size:13px;line-height:1.5;"></div>
 
-    <!-- TAB SWITCHER (Bulk Wine has only Metrics, no Map) -->
-    <div class="view-tabs">
-      <button class="view-tab active" id="bw-tab-btn-dashboard" onclick="switchTab('bw-dashboard')">Metrics</button>
+  <!-- TAB SWITCHER (Bulk Wine has only Metrics, no Map) -->
+  <div class="view-tabs">
+    <button class="tab-btn active">Metrics</button>
+  </div>
+
+  <!-- KPI GRID -->
+  <div class="kpi-grid" id="bw-kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Volume (gal)</div>
+      <div class="kpi-val" id="bw-k-vol">—</div>
+      <div class="kpi-breakdown" id="bw-k-vol-breakdown"></div>
     </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Vessels</div>
+      <div class="kpi-val" id="bw-k-vessels">—</div>
+      <div class="kpi-breakdown" id="bw-k-vessels-breakdown"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Avg Cost / Gal</div>
+      <div class="kpi-val" id="bw-k-cost">—</div>
+      <div class="kpi-breakdown" id="bw-k-cost-breakdown"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Varieties</div>
+      <div class="kpi-val" id="bw-k-var">—</div>
+      <div class="kpi-breakdown" id="bw-k-var-breakdown"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Top Owner</div>
+      <div class="kpi-val" id="bw-k-owner">—</div>
+      <div class="kpi-breakdown" id="bw-k-owner-breakdown"></div>
+    </div>
+  </div>
 
-    <!-- DASHBOARD TAB: KPIs + Charts -->
-    <div id="bw-tab-dashboard">
-
-    <!-- BW KPIs -->
-    <div class="kpi-grid">
-      <div class="kpi">
-        <div class="kpi-lbl">Total Volume</div>
-        <div class="kpi-body">
-          <div class="kpi-val" id="bw-k-vol">—</div>
-          <div class="kpi-breakdown" id="bw-k-vol-breakdown"></div>
-        </div>
-      </div>
-      <div class="kpi k-sage">
-        <div class="kpi-lbl">Total Vessels</div>
-        <div class="kpi-body">
-          <div class="kpi-val" id="bw-k-vessels">—</div>
-          <div class="kpi-breakdown" id="bw-k-vessels-breakdown"></div>
-        </div>
-      </div>
-      <div class="kpi k-dust">
-        <div class="kpi-lbl">Avg Cost/Gal</div>
-        <div class="kpi-body">
-          <div class="kpi-val" id="bw-k-cost">—</div>
-          <div class="kpi-breakdown" id="bw-k-cost-breakdown"></div>
-        </div>
-      </div>
-      <div class="kpi k-gold">
-        <div class="kpi-lbl">Unique Varieties</div>
-        <div class="kpi-body">
-          <div class="kpi-val" id="bw-k-var">—</div>
-          <div class="kpi-breakdown" id="bw-k-var-breakdown"></div>
-        </div>
-      </div>
-      <div class="kpi k-wine2">
-        <div class="kpi-lbl">Top Owner</div>
-        <div class="kpi-body">
-          <div class="kpi-val" id="bw-k-owner">—</div>
-          <div class="kpi-breakdown" id="bw-k-owner-breakdown"></div>
-        </div>
+  <!-- CHART GRID -->
+  <div class="chart-grid" id="bw-chart-grid">
+    <div class="chart-card" id="bw-cc-var">
+      <div class="chart-title-bar"><span class="chart-title">Volume by Variety</span></div>
+      <div class="chart-body">
+        <div class="chart-h-ava"><canvas id="bw-c-var"></canvas></div>
       </div>
     </div>
-
-    <!-- BULK WINE CHART GRID -->
-    <div id="bw-chart-grid">
-
-      <div class="chart-slot" id="bw-slot-var">
-        <div class="card" id="bw-card-var">
-          <div class="card-head">
-            <span class="drag-handle" title="Drag to reorder">⠿</span>
-            <div class="card-title" id="bw-var-title">Volume by Variety</div>
-          </div>
-          <div class="card-body">
-            <div class="chart-h-ava"><canvas id="bw-c-var"></canvas></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="chart-slot" id="bw-slot-owner">
-        <div class="card" id="bw-card-owner">
-          <div class="card-head">
-            <span class="drag-handle" title="Drag to reorder">⠿</span>
-            <div class="card-title" id="bw-owner-title">Volume by Owner</div>
-          </div>
-          <div class="card-body">
-            <div class="chart-h-ava"><canvas id="bw-c-owner"></canvas></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="chart-slot" id="bw-slot-subava">
-        <div class="card" id="bw-card-subava">
-          <div class="card-head">
-            <span class="drag-handle" title="Drag to reorder">⠿</span>
-            <div class="card-title" id="bw-subava-title">Volume by Sub AVA</div>
-          </div>
-          <div class="card-body">
-            <div class="chart-h-ava"><canvas id="bw-c-subava"></canvas></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="chart-slot" id="bw-slot-vintage">
-        <div class="card" id="bw-card-vintage">
-          <div class="card-head">
-            <span class="drag-handle" title="Drag to reorder">⠿</span>
-            <div class="card-title" id="bw-vintage-title">Volume by Vintage</div>
-          </div>
-          <div class="card-body">
-            <div class="chart-h-ava"><canvas id="bw-c-vintage"></canvas></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="chart-slot" id="bw-slot-alloc">
-        <div class="card" id="bw-card-alloc">
-          <div class="card-head">
-            <span class="drag-handle" title="Drag to reorder">⠿</span>
-            <div class="card-title" id="bw-alloc-title">Brand Allocation</div>
-          </div>
-          <div class="card-body">
-            <div class="chart-std"><canvas id="bw-c-alloc"></canvas></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="chart-slot" id="bw-slot-grade">
-        <div class="card" id="bw-card-grade">
-          <div class="card-head">
-            <span class="drag-handle" title="Drag to reorder">⠿</span>
-            <div class="card-title" id="bw-grade-title">Volume by Grading</div>
-          </div>
-          <div class="card-body">
-            <div class="chart-h-ava"><canvas id="bw-c-grade"></canvas></div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    </div><!-- /.tab-dashboard -->
-
-    <!-- DATA TABLE TAB -->
-    <div id="bw-data-table-section" style="margin-top:24px;">
-      <h3 style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:500;color:var(--ink);margin-bottom:12px;">Bulk Wine Vessels</h3>
-      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:3px;box-shadow:var(--shadow-sm);">
-        <table style="width:100%;border-collapse:collapse;font-size:11px;">
-          <thead style="background:var(--parchment);position:sticky;top:0;z-index:2;">
-            <tr style="border-bottom:2px solid var(--border);">
-              <th style="padding:10px 12px;text-align:left;color:var(--wine);font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;" onclick="sortBWTable('name')">Vessel</th>
-              <th style="padding:10px 12px;text-align:left;color:var(--wine);font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;" onclick="sortBWTable('vesselType')">Type</th>
-              <th style="padding:10px 12px;text-align:left;color:var(--wine);font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;" onclick="sortBWTable('variety')">Variety</th>
-              <th style="padding:10px 12px;text-align:left;color:var(--wine);font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;" onclick="sortBWTable('vintage')">Vintage</th>
-              <th style="padding:10px 12px;text-align:left;color:var(--wine);font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;" onclick="sortBWTable('owner')">Owner</th>
-              <th style="padding:10px 12px;text-align:left;color:var(--wine);font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;" onclick="sortBWTable('subregion')">Sub AVA</th>
-              <th style="padding:10px 12px;text-align:right;color:var(--wine);font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;" onclick="sortBWTable('volume')">Volume</th>
-              <th style="padding:10px 12px;text-align:left;color:var(--wine);font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;" onclick="sortBWTable('grading')">Grade</th>
-              <th style="padding:10px 12px;text-align:left;color:var(--wine);font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;" onclick="sortBWTable('taxState')">Bond State</th>
-              <th style="padding:10px 12px;text-align:right;color:var(--wine);font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;" onclick="sortBWTable('costPerGal')">Cost/Gal</th>
-            </tr>
-          </thead>
-          <tbody id="bw-table-body">
-            <tr><td colspan="10" style="padding:20px;text-align:center;color:var(--dust);">Loading bulk wine data...</td></tr>
-          </tbody>
-        </table>
+    <div class="chart-card" id="bw-cc-owner">
+      <div class="chart-title-bar"><span class="chart-title">Volume by Owner</span></div>
+      <div class="chart-body">
+        <div class="chart-h-ava"><canvas id="bw-c-owner"></canvas></div>
       </div>
     </div>
+    <div class="chart-card" id="bw-cc-subava">
+      <div class="chart-title-bar"><span class="chart-title">Volume by Sub AVA</span></div>
+      <div class="chart-body">
+        <div class="chart-h-ava"><canvas id="bw-c-subava"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-card" id="bw-cc-vintage">
+      <div class="chart-title-bar"><span class="chart-title">Volume by Vintage</span></div>
+      <div class="chart-body">
+        <div class="chart-h-ava"><canvas id="bw-c-vintage"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-card" id="bw-cc-alloc">
+      <div class="chart-title-bar"><span class="chart-title">Brand Allocation</span></div>
+      <div class="chart-body">
+        <div class="chart-std"><canvas id="bw-c-alloc"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-card" id="bw-cc-grade">
+      <div class="chart-title-bar"><span class="chart-title">Volume by Grading</span></div>
+      <div class="chart-body">
+        <div class="chart-h-ava"><canvas id="bw-c-grade"></canvas></div>
+      </div>
+    </div>
+  </div>
 
-  </main>
-  <footer>
-    <span>Grapevine Capital · 2026 Bulk Wine Inventory · Vintrace Live</span>
+  <!-- DATA TABLE -->
+  <div class="table-wrap" id="bw-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th onclick="sortBWTable('name')">Vessel</th>
+          <th onclick="sortBWTable('type')">Type</th>
+          <th onclick="sortBWTable('variety')">Variety</th>
+          <th onclick="sortBWTable('vintage')">Vintage</th>
+          <th onclick="sortBWTable('owner')">Owner</th>
+          <th onclick="sortBWTable('subava')">Sub AVA</th>
+          <th onclick="sortBWTable('volume')">Volume</th>
+          <th onclick="sortBWTable('grading')">Grading</th>
+          <th onclick="sortBWTable('taxstate')">Tax State</th>
+          <th onclick="sortBWTable('cost')">Cost/Gal</th>
+        </tr>
+      </thead>
+      <tbody id="bw-table-body">
+      </tbody>
+    </table>
+  </div>
+
+</main>
+  <footer class="footer">
     <span>Showing <span class="footer-count" id="bw-footer-count">—</span> records</span>
   </footer>
-  </div><!-- /.bw-main-col -->
-
+</div><!-- /.bw-main-col -->
 </div><!-- /.app-body -->
 
 <script>
@@ -4185,6 +4079,350 @@ function savePrefs() {
   } catch(e) { /* localStorage unavailable — fail silently */ }
 }
 
+// ═══════════════════════════════════════════════════════════
+// BULK WINE MODE
+// ═══════════════════════════════════════════════════════════
+
+let BULK_WINE_DATA = [];
+let BULK_WINE_VISIBLE = { vol: true, vessels: true, cost: true, var: true, owner: true };
+let BULK_WINE_CHARTS_VISIBLE = {
+  'var-chart': true, 'owner-chart': true, 'subava-chart': true,
+  'vintage-chart': true, 'alloc-chart': true, 'grade-chart': true
+};
+let BW_CHARTS = {};
+let BW_CURRENT_MODE = 'grape';
+let BW_DATA_FETCHED = false;
+
+// ── Vintrace API config ──
+const PROXY_BASE = 'https://bulk-wine.newhall.workers.dev';
+const VINTRACE_API_BASE = PROXY_BASE || 'https://us57.vintrace.net';
+const VINTRACE_API_TOKEN = 'k51oMu1Q5Utpyxwom_XFYCzn0la5EuSD5-sDAVd6NRpiP5n-Rh9bkHdkEKlX';
+const VINTRACE_ENDPOINT = '/grapevine/api/v7/report/vessel-details-report';
+
+function switchMode(mode) {
+  BW_CURRENT_MODE = mode;
+  const isWineMode = mode === 'wine';
+  document.getElementById('mode-grape').classList.toggle('active', !isWineMode);
+  document.getElementById('mode-wine').classList.toggle('active', isWineMode);
+  document.getElementById('header-title').textContent = isWineMode ? 'Bulk Wine Inventory' : 'Grape Sales Dashboard';
+  document.getElementById('header-subtitle').textContent = isWineMode ? 'Vintrace Live' : '2026 Vintage';
+  document.getElementById('live-badge-text').textContent = isWineMode ? 'Live · Vintrace' : 'Live · SharePoint';
+  document.body.classList.toggle('bulk-wine-mode', isWineMode);
+  closeMobileSidebar();
+  if (isWineMode && !BW_DATA_FETCHED) {
+    fetchBulkWineData();
+  } else if (isWineMode && BW_DATA_FETCHED) {
+    renderBulkWineDashboard();
+  }
+}
+
+async function fetchBulkWineData() {
+  try {
+    document.getElementById('load-status').textContent = 'Fetching bulk wine inventory...';
+    document.getElementById('loading-overlay').style.display = 'flex';
+    document.getElementById('loading-overlay').classList.remove('fade-out');
+
+    const allResults = [];
+    let offset = 0;
+    const pageSize = 100;
+    let hasMore = true;
+
+    while (hasMore) {
+      const url = `${VINTRACE_API_BASE}${VINTRACE_ENDPOINT}?offset=${offset}&limit=${pageSize}&extraFields=allocations,composition`;
+      const fetchHeaders = { 'Accept': 'application/json' };
+      if (!PROXY_BASE) fetchHeaders['Authorization'] = `Bearer ${VINTRACE_API_TOKEN}`;
+      const resp = await fetch(url, { headers: fetchHeaders });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`Vintrace API error ${resp.status}: ${text}`);
+      }
+
+      const json = await resp.json();
+      if (json.results && json.results.length > 0) {
+        allResults.push(...json.results);
+        offset += json.results.length;
+        document.getElementById('load-status').textContent = `Fetching bulk wine inventory... ${allResults.length} vessels`;
+        hasMore = json.results.length === pageSize;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    BULK_WINE_DATA = allResults;
+    BW_DATA_FETCHED = true;
+    console.log(`Loaded ${BULK_WINE_DATA.length} bulk wine vessels`);
+    buildBulkWineFilters();
+    renderBulkWineDashboard();
+
+    document.getElementById('loading-overlay').classList.add('fade-out');
+    setTimeout(() => { document.getElementById('loading-overlay').style.display = 'none'; }, 500);
+  } catch (err) {
+    console.error('Error fetching bulk wine data:', err);
+    const overlay = document.getElementById('loading-overlay');
+    const errDiv = document.getElementById('load-error');
+
+    const isCORS = err.message === 'Failed to fetch' || err.name === 'TypeError';
+    const msg = isCORS
+      ? `<strong>CORS Error — Cross-Origin Request Blocked</strong><br><br>The Vintrace API at <code>us57.vintrace.net</code> does not allow requests from this domain.<br><br><strong>To fix:</strong> Deploy the included <code>vintrace-proxy-worker.js</code> as a Cloudflare Worker (free), then paste the worker URL into the <code>PROXY_BASE</code> variable in this file.`
+      : `<strong>Bulk Wine Data Error:</strong><br>${err.message}`;
+
+    errDiv.style.display = 'block';
+    errDiv.innerHTML = msg;
+
+    const banner = document.getElementById('bw-error-banner');
+    if (banner) { banner.style.display = 'block'; banner.innerHTML = msg; }
+
+    overlay.classList.remove('fade-out');
+    setTimeout(() => {
+      overlay.classList.add('fade-out');
+      setTimeout(() => { overlay.style.display = 'none'; }, 600);
+    }, 4000);
+  }
+}
+
+function buildBulkWineFilters() {
+  const filters = {
+    'bw-owner': new Set(),
+    'bw-variety': new Set(),
+    'bw-vintage': new Set(),
+    'bw-subava': new Set(),
+    'bw-grading': new Set(),
+    'bw-taxstate': new Set()
+  };
+
+  BULK_WINE_DATA.forEach(vessel => {
+    if (vessel.owner?.name) filters['bw-owner'].add(vessel.owner.name);
+    if (vessel.wineBatch?.designatedVariety?.name) filters['bw-variety'].add(vessel.wineBatch.designatedVariety.name);
+    if (vessel.wineBatch?.vintage) filters['bw-vintage'].add(String(vessel.wineBatch.vintage));
+    if (vessel.wineBatch?.designatedSubRegion?.name) filters['bw-subava'].add(vessel.wineBatch.designatedSubRegion.name);
+    if (vessel.wineBatch?.grading?.valueName) filters['bw-grading'].add(vessel.wineBatch.grading.valueName);
+    if (vessel.ttbDetails?.taxState) filters['bw-taxstate'].add(vessel.ttbDetails.taxState);
+  });
+
+  Object.entries(filters).forEach(([key, values]) => {
+    const select = document.getElementById(`f-${key}`);
+    if (!select) return;
+    const sortedValues = Array.from(values).sort();
+    sortedValues.forEach(val => {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = val;
+      select.appendChild(opt);
+    });
+
+    const cl = document.getElementById(`cl-${key}`);
+    if (cl) {
+      sortedValues.forEach(val => {
+        const label = document.createElement('label');
+        label.innerHTML = `<input type="checkbox" value="${val}" onchange="renderBulkWineDashboard()"> ${val}`;
+        cl.appendChild(label);
+      });
+    }
+  });
+}
+
+function bwToggleAll(allCb, clId) {
+  const cl = document.getElementById(clId);
+  if (!cl) return;
+  cl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    if (cb.value !== '__all__') cb.checked = false;
+  });
+  allCb.checked = true;
+  renderBulkWineDashboard();
+}
+
+function getBulkWineFiltered() {
+  const filterIds = ['f-bw-owner', 'f-bw-variety', 'f-bw-vintage', 'f-bw-subava', 'f-bw-grading', 'f-bw-taxstate'];
+  const selected = {};
+
+  filterIds.forEach(id => {
+    const elem = document.getElementById(id);
+    if (!elem) return;
+    if (IS_TOUCH) {
+      const checklist = document.getElementById(id.replace('f-', 'cl-'));
+      if (checklist) {
+        const checked = [];
+        checklist.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+          if (cb.checked && cb.value !== '__all__') checked.push(cb.value);
+        });
+        selected[id] = checked;
+      }
+    } else {
+      const vals = [];
+      Array.from(elem.selectedOptions).forEach(opt => {
+        if (opt.value !== '__all__') vals.push(opt.value);
+      });
+      selected[id] = vals;
+    }
+  });
+
+  return BULK_WINE_DATA.filter(vessel => {
+    if (selected['f-bw-owner']?.length > 0 && !selected['f-bw-owner'].includes(vessel.owner?.name || '')) return false;
+    if (selected['f-bw-variety']?.length > 0 && !selected['f-bw-variety'].includes(vessel.wineBatch?.designatedVariety?.name || '')) return false;
+    if (selected['f-bw-vintage']?.length > 0 && !selected['f-bw-vintage'].includes(String(vessel.wineBatch?.vintage || ''))) return false;
+    if (selected['f-bw-subava']?.length > 0 && !selected['f-bw-subava'].includes(vessel.wineBatch?.designatedSubRegion?.name || '')) return false;
+    if (selected['f-bw-grading']?.length > 0 && !selected['f-bw-grading'].includes(vessel.wineBatch?.grading?.valueName || '')) return false;
+    if (selected['f-bw-taxstate']?.length > 0 && !selected['f-bw-taxstate'].includes(vessel.ttbDetails?.taxState || '')) return false;
+    return true;
+  });
+}
+
+function renderBulkWineDashboard() {
+  const filtered = getBulkWineFiltered();
+  renderBulkWineKPIs(filtered);
+  renderBulkWineCharts(filtered);
+  renderBulkWineTable(filtered);
+  document.getElementById('bw-footer-count').textContent = filtered.length;
+}
+
+function renderBulkWineKPIs(data) {
+  const volGal = data.reduce((sum, v) => sum + (v.volume?.value || 0), 0);
+  const vessels = data.length;
+  const totalCost = data.reduce((sum, v) => sum + (v.cost?.total || 0), 0);
+  const costPerGal = volGal > 0 ? totalCost / volGal : 0;
+  const varieties = new Set(data.map(v => v.wineBatch?.designatedVariety?.name).filter(Boolean)).size;
+  const owners = {};
+  data.forEach(v => {
+    const o = v.owner?.name || 'Unknown';
+    owners[o] = (owners[o] || 0) + (v.volume?.value || 0);
+  });
+  const topOwner = Object.keys(owners).length > 0
+    ? Object.entries(owners).reduce((a, b) => a[1] > b[1] ? a : b)[0]
+    : '—';
+
+  document.getElementById('bw-k-vol').textContent = volGal.toLocaleString(undefined, {maximumFractionDigits: 0});
+  document.getElementById('bw-k-vessels').textContent = vessels.toLocaleString();
+  document.getElementById('bw-k-cost').textContent = `$${costPerGal.toFixed(2)}`;
+  document.getElementById('bw-k-var').textContent = varieties.toLocaleString();
+  document.getElementById('bw-k-owner').textContent = topOwner;
+}
+
+function renderBulkWineCharts(data) {
+  const byVariety = {};
+  data.forEach(v => { const k = v.wineBatch?.designatedVariety?.name || 'Unknown'; byVariety[k] = (byVariety[k] || 0) + (v.volume?.value || 0); });
+  renderBulkWineChart('bw-c-var', 'bar', 'Volume by Variety', byVariety);
+
+  const byOwner = {};
+  data.forEach(v => { const k = v.owner?.name || 'Unknown'; byOwner[k] = (byOwner[k] || 0) + (v.volume?.value || 0); });
+  renderBulkWineChart('bw-c-owner', 'bar', 'Volume by Owner', byOwner);
+
+  const bySubAVA = {};
+  data.forEach(v => { const k = v.wineBatch?.designatedSubRegion?.name || 'Unknown'; bySubAVA[k] = (bySubAVA[k] || 0) + (v.volume?.value || 0); });
+  renderBulkWineChart('bw-c-subava', 'bar', 'Volume by Sub AVA', bySubAVA);
+
+  const byVintage = {};
+  data.forEach(v => { const k = v.wineBatch?.vintage || 'Unknown'; byVintage[k] = (byVintage[k] || 0) + (v.volume?.value || 0); });
+  renderBulkWineChart('bw-c-vintage', 'bar', 'Volume by Vintage', byVintage);
+
+  const byAlloc = {};
+  data.forEach(v => {
+    if (v.allocations && v.allocations.length > 0) {
+      v.allocations.forEach(alloc => {
+        const brand = alloc.product?.name || 'Unallocated';
+        byAlloc[brand] = (byAlloc[brand] || 0) + (alloc.allocationVolume?.value || 0);
+      });
+    } else {
+      byAlloc['Unallocated'] = (byAlloc['Unallocated'] || 0) + (v.volume?.value || 0);
+    }
+  });
+  renderBulkWineDoughnut('bw-c-alloc', byAlloc);
+
+  const byGrade = {};
+  data.forEach(v => { const k = v.wineBatch?.grading?.valueName || 'Unknown'; byGrade[k] = (byGrade[k] || 0) + (v.volume?.value || 0); });
+  renderBulkWineChart('bw-c-grade', 'bar', 'Volume by Grading', byGrade);
+}
+
+function renderBulkWineChart(canvasId, type, title, dataObj) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const labels = Object.keys(dataObj).sort();
+  const values = labels.map(l => dataObj[l]);
+  const colors = ['#6b1f2a', '#9e3545', '#b06070', '#b8881e', '#d9aa4a', '#3d5c38', '#6a8f62', '#7e7060'];
+  if (BW_CHARTS[canvasId]) BW_CHARTS[canvasId].destroy();
+  BW_CHARTS[canvasId] = new Chart(canvas, {
+    type: type,
+    data: {
+      labels,
+      datasets: [{ label: title, data: values, backgroundColor: colors.slice(0, labels.length).map((c, i) => colors[i % colors.length]), borderColor: 'rgba(0,0,0,0.08)', borderWidth: 1 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { family: "'DM Mono', monospace", size: 9 } }, grid: { color: 'rgba(28,23,18,0.05)', drawBorder: false } },
+        y: { ticks: { font: { family: "'DM Mono', monospace", size: 9 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderBulkWineDoughnut(canvasId, dataObj) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const labels = Object.keys(dataObj);
+  const values = labels.map(l => dataObj[l]);
+  const colors = ['#6b1f2a', '#9e3545', '#b06070', '#b8881e', '#d9aa4a', '#3d5c38', '#6a8f62', '#7e7060'];
+  if (BW_CHARTS[canvasId]) BW_CHARTS[canvasId].destroy();
+  BW_CHARTS[canvasId] = new Chart(canvas, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors.slice(0, labels.length).map((c, i) => colors[i % colors.length]), borderColor: 'white', borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { family: "'DM Mono', monospace", size: 9 } } } } }
+  });
+}
+
+function renderBulkWineTable(data) {
+  const tbody = document.getElementById('bw-table-body');
+  tbody.innerHTML = '';
+  data.forEach(vessel => {
+    const row = document.createElement('tr');
+    row.style.cssText = 'border-bottom:1px solid var(--border);';
+    row.innerHTML = `
+      <td style="padding:10px 12px;color:var(--ink);">${vessel.name || '—'}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${vessel.vesselType || '—'}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.designatedVariety?.name || '—'}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.vintage || '—'}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${vessel.owner?.name || '—'}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.designatedSubRegion?.name || '—'}</td>
+      <td style="padding:10px 12px;color:var(--ink);text-align:right;">${(vessel.volume?.value || 0).toLocaleString(undefined, {maximumFractionDigits: 1})} ${vessel.volume?.unit || 'L'}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.grading?.valueName || '—'}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${vessel.ttbDetails?.taxState || '—'}</td>
+      <td style="padding:10px 12px;color:var(--ink);text-align:right;">$${((vessel.cost?.total || 0) / (vessel.volume?.value || 1)).toFixed(2)}</td>
+    `;
+    tbody.appendChild(row);
+  });
+  if (data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;text-align:center;color:var(--dust);">No vessels match filters</td></tr>';
+  }
+}
+
+function sortBWTable(column) { console.log('Sort by', column); }
+
+function toggleWidgetBW(key) {
+  BULK_WINE_VISIBLE[key] = !BULK_WINE_VISIBLE[key];
+  const btn = document.getElementById(`vis-bw-${key}`);
+  if (btn) btn.classList.toggle('active', BULK_WINE_VISIBLE[key]);
+  renderBulkWineDashboard();
+}
+
+function toggleChartBW(key) {
+  BULK_WINE_CHARTS_VISIBLE[key] = !BULK_WINE_CHARTS_VISIBLE[key];
+  const btn = document.getElementById(`vis-bw-${key.replace('-chart', '')}-chart`);
+  if (btn) btn.classList.toggle('active', BULK_WINE_CHARTS_VISIBLE[key]);
+  renderBulkWineDashboard();
+}
+
+function doResetBW() {
+  const filterIds = ['f-bw-owner', 'f-bw-variety', 'f-bw-vintage', 'f-bw-subava', 'f-bw-grading', 'f-bw-taxstate'];
+  filterIds.forEach(id => {
+    const elem = document.getElementById(id);
+    if (elem) { Array.from(elem.options).forEach((opt, idx) => { opt.selected = idx === 0; }); }
+    const cl = document.getElementById(id.replace('f-', 'cl-'));
+    if (cl) { cl.querySelectorAll('input[type="checkbox"]').forEach((cb, idx) => { cb.checked = idx === 0; }); }
+  });
+  renderBulkWineDashboard();
+}
+
 function loadPrefs() {
   try {
     const raw = localStorage.getItem(PREF_KEY);
@@ -4249,449 +4487,6 @@ function restoreFilterSelections() {
       if (allCb) allCb.checked = !anySelected;
     }
   });
-}
-
-// ═══════════════════════════════════════════════════════════
-// BULK WINE MODE
-// ═══════════════════════════════════════════════════════════
-
-let BULK_WINE_DATA = [];
-let BULK_WINE_VISIBLE = { vol: true, vessels: true, cost: true, var: true, owner: true };
-let BULK_WINE_CHARTS_VISIBLE = {
-  'var-chart': true, 'owner-chart': true, 'subava-chart': true,
-  'vintage-chart': true, 'alloc-chart': true, 'grade-chart': true
-};
-let BW_CHARTS = {};
-let BW_CURRENT_MODE = 'grape';
-let BW_DATA_FETCHED = false;
-
-// ── Vintrace API config ──
-// PROXY_BASE: Set to your Cloudflare Worker URL after deploying vintrace-proxy-worker.js
-//   e.g. 'https://vintrace-proxy.yourname.workers.dev'
-// When set, requests go through the proxy (no CORS, token stays server-side).
-// When empty, requests go direct to Vintrace (only works same-origin).
-const PROXY_BASE = 'https://bulk-wine.newhall.workers.dev';
-const VINTRACE_API_BASE = PROXY_BASE || 'https://us57.vintrace.net';
-const VINTRACE_API_TOKEN = 'k51oMu1Q5Utpyxwom_XFYCzn0la5EuSD5-sDAVd6NRpiP5n-Rh9bkHdkEKlX';
-const VINTRACE_ENDPOINT = '/grapevine/api/v7/report/vessel-details-report';
-
-function switchMode(mode) {
-  BW_CURRENT_MODE = mode;
-  const isWineMode = mode === 'wine';
-
-  // Update button states
-  document.getElementById('mode-grape').classList.toggle('active', !isWineMode);
-  document.getElementById('mode-wine').classList.toggle('active', isWineMode);
-
-  // Update header
-  document.getElementById('header-title').textContent = isWineMode
-    ? 'Bulk Wine Inventory'
-    : 'Grape Sales Dashboard';
-  document.getElementById('header-subtitle').textContent = isWineMode
-    ? 'Vintrace Live'
-    : '2026 Vintage';
-  document.getElementById('live-badge-text').textContent = isWineMode
-    ? 'Live · Vintrace'
-    : 'Live · SharePoint';
-
-  // Toggle body class for CSS mode switching
-  document.body.classList.toggle('bulk-wine-mode', isWineMode);
-
-  // Close mobile sidebar
-  closeMobileSidebar();
-
-  // Fetch bulk wine data on first switch
-  if (isWineMode && !BW_DATA_FETCHED) {
-    fetchBulkWineData();
-  } else if (isWineMode && BW_DATA_FETCHED) {
-    renderBulkWineDashboard();
-  }
-}
-
-async function fetchBulkWineData() {
-  try {
-    document.getElementById('load-status').textContent = 'Fetching bulk wine inventory...';
-    document.getElementById('loading-overlay').style.display = 'flex';
-
-    const allResults = [];
-    let offset = 0;
-    const pageSize = 100;
-    let hasMore = true;
-
-    while (hasMore) {
-      const url = `${VINTRACE_API_BASE}${VINTRACE_ENDPOINT}?offset=${offset}&limit=${pageSize}&extraFields=allocations,composition`;
-      const fetchHeaders = { 'Accept': 'application/json' };
-      // Only send token directly when NOT using the proxy (proxy adds it server-side)
-      if (!PROXY_BASE) fetchHeaders['Authorization'] = `Bearer ${VINTRACE_API_TOKEN}`;
-      const resp = await fetch(url, { headers: fetchHeaders });
-
-      if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(`Vintrace API error ${resp.status}: ${text}`);
-      }
-
-      const json = await resp.json();
-      if (json.results && json.results.length > 0) {
-        allResults.push(...json.results);
-        offset += json.results.length;
-        hasMore = json.results.length === pageSize;
-      } else {
-        hasMore = false;
-      }
-    }
-
-    BULK_WINE_DATA = allResults;
-    BW_DATA_FETCHED = true;
-    parseBulkWineRows();
-    buildBulkWineFilters();
-    renderBulkWineDashboard();
-
-    document.getElementById('loading-overlay').classList.add('fade-out');
-    setTimeout(() => { document.getElementById('loading-overlay').style.display = 'none'; }, 500);
-  } catch (err) {
-    console.error('Error fetching bulk wine data:', err);
-    const overlay = document.getElementById('loading-overlay');
-    const errDiv = document.getElementById('load-error');
-
-    // Determine if this is likely a CORS error
-    const isCORS = err.message === 'Failed to fetch' || err.name === 'TypeError';
-    const msg = isCORS
-      ? `<strong>CORS Error — Cross-Origin Request Blocked</strong><br><br>
-         The Vintrace API at <code>us57.vintrace.net</code> does not allow requests from this domain.<br><br>
-         <strong>To fix:</strong> Deploy the included <code>vintrace-proxy-worker.js</code> as a Cloudflare Worker (free), then paste the worker URL into the <code>PROXY_BASE</code> variable near line 4270 of this file.`
-      : `<strong>Bulk Wine Data Error:</strong><br>${err.message}`;
-
-    errDiv.style.display = 'block';
-    errDiv.innerHTML = msg;
-
-    // Also show persistent error banner in the bulk wine main area
-    const banner = document.getElementById('bw-error-banner');
-    if (banner) {
-      banner.style.display = 'block';
-      banner.innerHTML = msg;
-    }
-
-    // Ensure loading overlay hides properly so the error banner is visible
-    overlay.classList.remove('fade-out');
-    setTimeout(() => {
-      overlay.classList.add('fade-out');
-      setTimeout(() => { overlay.style.display = 'none'; }, 600);
-    }, 4000);
-  }
-}
-
-function parseBulkWineRows() {
-  // Vintrace API returns vessel objects that the render functions consume directly.
-  // No transformation needed — volume, owner, wineBatch, allocations, cost, ttbDetails
-  // are accessed as-is from each vessel object in BULK_WINE_DATA.
-  console.log(`Parsed ${BULK_WINE_DATA.length} bulk wine vessels`);
-}
-
-function buildBulkWineFilters() {
-  const filters = {
-    'bw-owner': new Set(),
-    'bw-variety': new Set(),
-    'bw-vintage': new Set(),
-    'bw-subava': new Set(),
-    'bw-grading': new Set(),
-    'bw-taxstate': new Set()
-  };
-
-  BULK_WINE_DATA.forEach(vessel => {
-    if (vessel.owner?.name) filters['bw-owner'].add(vessel.owner.name);
-    if (vessel.wineBatch?.designatedVariety?.name) filters['bw-variety'].add(vessel.wineBatch.designatedVariety.name);
-    if (vessel.wineBatch?.vintage) filters['bw-vintage'].add(String(vessel.wineBatch.vintage));
-    if (vessel.wineBatch?.designatedSubRegion?.name) filters['bw-subava'].add(vessel.wineBatch.designatedSubRegion.name);
-    if (vessel.wineBatch?.grading?.valueName) filters['bw-grading'].add(vessel.wineBatch.grading.valueName);
-    if (vessel.ttbDetails?.taxState) filters['bw-taxstate'].add(vessel.ttbDetails.taxState);
-  });
-
-  // Populate filter selects
-  Object.entries(filters).forEach(([key, values]) => {
-    const select = document.getElementById(`f-${key}`);
-    if (!select) return;
-    const sortedValues = Array.from(values).sort();
-    sortedValues.forEach(val => {
-      const opt = document.createElement('option');
-      opt.value = val;
-      opt.textContent = val;
-      select.appendChild(opt);
-    });
-
-    // Also populate checklist
-    const cl = document.getElementById(`cl-${key}`);
-    if (cl) {
-      const allLabel = cl.querySelector('.all-option');
-      sortedValues.forEach(val => {
-        const label = document.createElement('label');
-        label.innerHTML = `<input type="checkbox" value="${val}" onchange="renderBulkWineDashboard()"> ${val}`;
-        cl.appendChild(label);
-      });
-    }
-  });
-}
-
-function getBulkWineFiltered() {
-  const filterIds = ['f-bw-owner', 'f-bw-variety', 'f-bw-vintage', 'f-bw-subava', 'f-bw-grading', 'f-bw-taxstate'];
-  const selected = {};
-
-  filterIds.forEach(id => {
-    const elem = document.getElementById(id);
-    if (!elem) return;
-    if (IS_TOUCH) {
-      const checklist = document.getElementById(id.replace('f-', 'cl-'));
-      if (checklist) {
-        const checked = [];
-        checklist.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-          if (cb.checked && cb.value !== '__all__') checked.push(cb.value);
-        });
-        selected[id] = checked;
-      }
-    } else {
-      const vals = [];
-      Array.from(elem.selectedOptions).forEach(opt => {
-        if (opt.value !== '__all__') vals.push(opt.value);
-      });
-      selected[id] = vals;
-    }
-  });
-
-  return BULK_WINE_DATA.filter(vessel => {
-    if (selected['f-bw-owner'].length > 0 && !selected['f-bw-owner'].includes(vessel.owner?.name || '')) return false;
-    if (selected['f-bw-variety'].length > 0 && !selected['f-bw-variety'].includes(vessel.wineBatch?.designatedVariety?.name || '')) return false;
-    if (selected['f-bw-vintage'].length > 0 && !selected['f-bw-vintage'].includes(String(vessel.wineBatch?.vintage || ''))) return false;
-    if (selected['f-bw-subava'].length > 0 && !selected['f-bw-subava'].includes(vessel.wineBatch?.designatedSubRegion?.name || '')) return false;
-    if (selected['f-bw-grading'].length > 0 && !selected['f-bw-grading'].includes(vessel.wineBatch?.grading?.valueName || '')) return false;
-    if (selected['f-bw-taxstate'].length > 0 && !selected['f-bw-taxstate'].includes(vessel.ttbDetails?.taxState || '')) return false;
-    return true;
-  });
-}
-
-function renderBulkWineDashboard() {
-  const filtered = getBulkWineFiltered();
-  renderBulkWineKPIs(filtered);
-  renderBulkWineCharts(filtered);
-  renderBulkWineTable(filtered);
-  document.getElementById('bw-footer-count').textContent = filtered.length;
-}
-
-function renderBulkWineKPIs(data) {
-  const volGal = data.reduce((sum, v) => sum + (v.volume?.value || 0), 0);
-  const vessels = data.length;
-  const totalCost = data.reduce((sum, v) => sum + (v.cost?.total || 0), 0);
-  const costPerGal = volGal > 0 ? totalCost / volGal : 0;
-  const varieties = new Set(data.map(v => v.wineBatch?.designatedVariety?.name).filter(Boolean)).size;
-  const owners = {};
-  data.forEach(v => {
-    const o = v.owner?.name || 'Unknown';
-    owners[o] = (owners[o] || 0) + (v.volume?.value || 0);
-  });
-  const topOwner = Object.keys(owners).length > 0
-    ? Object.entries(owners).reduce((a, b) => a[1] > b[1] ? a : b)[0]
-    : '—';
-
-  document.getElementById('bw-k-vol').textContent = volGal.toLocaleString(undefined, {maximumFractionDigits: 0});
-  document.getElementById('bw-k-vessels').textContent = vessels.toLocaleString();
-  document.getElementById('bw-k-cost').textContent = `$${costPerGal.toFixed(2)}`;
-  document.getElementById('bw-k-var').textContent = varieties.toLocaleString();
-  document.getElementById('bw-k-owner').textContent = topOwner;
-}
-
-function renderBulkWineCharts(data) {
-  // Group by variety
-  const byVariety = {};
-  data.forEach(v => {
-    const variety = v.wineBatch?.designatedVariety?.name || 'Unknown';
-    byVariety[variety] = (byVariety[variety] || 0) + (v.volume?.value || 0);
-  });
-  renderBulkWineChart('bw-c-var', 'bar', 'Volume by Variety', byVariety);
-
-  // Group by owner
-  const byOwner = {};
-  data.forEach(v => {
-    const owner = v.owner?.name || 'Unknown';
-    byOwner[owner] = (byOwner[owner] || 0) + (v.volume?.value || 0);
-  });
-  renderBulkWineChart('bw-c-owner', 'bar', 'Volume by Owner', byOwner);
-
-  // Group by sub-region
-  const bySubAVA = {};
-  data.forEach(v => {
-    const subava = v.wineBatch?.designatedSubRegion?.name || 'Unknown';
-    bySubAVA[subava] = (bySubAVA[subava] || 0) + (v.volume?.value || 0);
-  });
-  renderBulkWineChart('bw-c-subava', 'bar', 'Volume by Sub AVA', bySubAVA);
-
-  // Group by vintage
-  const byVintage = {};
-  data.forEach(v => {
-    const vintage = v.wineBatch?.vintage || 'Unknown';
-    byVintage[vintage] = (byVintage[vintage] || 0) + (v.volume?.value || 0);
-  });
-  renderBulkWineChart('bw-c-vintage', 'bar', 'Volume by Vintage', byVintage);
-
-  // Brand allocation (doughnut)
-  const byAlloc = {};
-  data.forEach(v => {
-    if (v.allocations && v.allocations.length > 0) {
-      v.allocations.forEach(alloc => {
-        const brand = alloc.product?.name || 'Unallocated';
-        byAlloc[brand] = (byAlloc[brand] || 0) + (alloc.allocationVolume?.value || 0);
-      });
-    } else {
-      byAlloc['Unallocated'] = (byAlloc['Unallocated'] || 0) + (v.volume?.value || 0);
-    }
-  });
-  renderBulkWineDoughnut('bw-c-alloc', byAlloc);
-
-  // Group by grading
-  const byGrade = {};
-  data.forEach(v => {
-    const grade = v.wineBatch?.grading?.valueName || 'Unknown';
-    byGrade[grade] = (byGrade[grade] || 0) + (v.volume?.value || 0);
-  });
-  renderBulkWineChart('bw-c-grade', 'bar', 'Volume by Grading', byGrade);
-}
-
-function renderBulkWineChart(canvasId, type, title, dataObj) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-
-  const labels = Object.keys(dataObj).sort();
-  const values = labels.map(l => dataObj[l]);
-  const colors = ['#6b1f2a', '#9e3545', '#b06070', '#b8881e', '#d9aa4a', '#3d5c38', '#6a8f62', '#7e7060'];
-
-  if (BW_CHARTS[canvasId]) BW_CHARTS[canvasId].destroy();
-
-  BW_CHARTS[canvasId] = new Chart(canvas, {
-    type: type,
-    data: {
-      labels,
-      datasets: [{
-        label: title,
-        data: values,
-        backgroundColor: colors.slice(0, labels.length).map((c, i) => colors[i % colors.length]),
-        borderColor: 'rgba(0,0,0,0.08)',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      indexAxis: 'y',
-      plugins: { legend: { display: false } },
-      scales: {
-        x: {
-          ticks: { font: { family: "'DM Mono', monospace", size: 9 } },
-          grid: { color: 'rgba(28,23,18,0.05)', drawBorder: false }
-        },
-        y: {
-          ticks: { font: { family: "'DM Mono', monospace", size: 9 } },
-          grid: { display: false }
-        }
-      }
-    }
-  });
-}
-
-function renderBulkWineDoughnut(canvasId, dataObj) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-
-  const labels = Object.keys(dataObj);
-  const values = labels.map(l => dataObj[l]);
-  const colors = ['#6b1f2a', '#9e3545', '#b06070', '#b8881e', '#d9aa4a', '#3d5c38', '#6a8f62', '#7e7060'];
-
-  if (BW_CHARTS[canvasId]) BW_CHARTS[canvasId].destroy();
-
-  BW_CHARTS[canvasId] = new Chart(canvas, {
-    type: 'doughnut',
-    data: {
-      labels,
-      datasets: [{
-        data: values,
-        backgroundColor: colors.slice(0, labels.length).map((c, i) => colors[i % colors.length]),
-        borderColor: 'white',
-        borderWidth: 2
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { font: { family: "'DM Mono', monospace", size: 9 } }
-        }
-      }
-    }
-  });
-}
-
-function renderBulkWineTable(data) {
-  const tbody = document.getElementById('bw-table-body');
-  tbody.innerHTML = '';
-
-  data.forEach(vessel => {
-    const row = document.createElement('tr');
-    row.style.cssText = 'border-bottom:1px solid var(--border);';
-    row.innerHTML = `
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.name || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.vesselType || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.designatedVariety?.name || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.vintage || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.owner?.name || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.designatedSubRegion?.name || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);text-align:right;">${(vessel.volume?.value || 0).toLocaleString(undefined, {maximumFractionDigits: 1})} ${vessel.volume?.unit || 'L'}</td>
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.grading?.valueName || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.ttbDetails?.taxState || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);text-align:right;">$${((vessel.cost?.total || 0) / (vessel.volume?.value || 1)).toFixed(2)}</td>
-    `;
-    tbody.appendChild(row);
-  });
-
-  if (data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;text-align:center;color:var(--dust);">No vessels match filters</td></tr>';
-  }
-}
-
-function sortBWTable(column) {
-  // Basic sort implementation (can be enhanced)
-  console.log('Sort by', column);
-}
-
-function toggleWidgetBW(key) {
-  BULK_WINE_VISIBLE[key] = !BULK_WINE_VISIBLE[key];
-  const btn = document.getElementById(`vis-bw-${key}`);
-  if (btn) btn.classList.toggle('active', BULK_WINE_VISIBLE[key]);
-  renderBulkWineDashboard();
-}
-
-function toggleChartBW(key) {
-  BULK_WINE_CHARTS_VISIBLE[key] = !BULK_WINE_CHARTS_VISIBLE[key];
-  const btn = document.getElementById(`vis-bw-${key.replace('-chart', '')}-chart`);
-  if (btn) btn.classList.toggle('active', BULK_WINE_CHARTS_VISIBLE[key]);
-  renderBulkWineDashboard();
-}
-
-function doResetBW() {
-  const filterIds = ['f-bw-owner', 'f-bw-variety', 'f-bw-vintage', 'f-bw-subava', 'f-bw-grading', 'f-bw-taxstate'];
-  filterIds.forEach(id => {
-    const elem = document.getElementById(id);
-    if (elem) {
-      Array.from(elem.options).forEach((opt, idx) => {
-        opt.selected = idx === 0; // Select first ("All") option
-      });
-    }
-    const cl = document.getElementById(id.replace('f-', 'cl-'));
-    if (cl) {
-      cl.querySelectorAll('input[type="checkbox"]').forEach((cb, idx) => {
-        if (idx === 0) cb.checked = true;
-        else cb.checked = false;
-      });
-    }
-  });
-  renderBulkWineDashboard();
 }
 
 // Start
