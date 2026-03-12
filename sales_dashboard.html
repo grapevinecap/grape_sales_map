@@ -1406,7 +1406,7 @@ body.bulk-wine-mode #bw-main-col { display: flex; }
   <div class="collapsible-body" id="section-bw-charts">
     <button class="vis-btn" id="vis-bw-var-chart"    onclick="toggleChartBW('var-chart')">    <span class="vis-dot"></span>Variety</button>
     <button class="vis-btn" id="vis-bw-owner-chart"  onclick="toggleChartBW('owner-chart')">  <span class="vis-dot"></span>Owner</button>
-    <button class="vis-btn" id="vis-bw-subava-chart" onclick="toggleChartBW('subava-chart')"> <span class="vis-dot"></span>Sub AVA</button>
+    <button class="vis-btn" id="vis-bw-subava-chart" onclick="toggleChartBW('subava-chart')"> <span class="vis-dot"></span>AVA</button>
     <button class="vis-btn" id="vis-bw-vintage-chart" onclick="toggleChartBW('vintage-chart')"><span class="vis-dot"></span>Vintage</button>
     <button class="vis-btn" id="vis-bw-alloc-chart"  onclick="toggleChartBW('alloc-chart')">  <span class="vis-dot"></span>Allocation</button>
     <button class="vis-btn" id="vis-bw-grade-chart"  onclick="toggleChartBW('grade-chart')">  <span class="vis-dot"></span>Grading</button>
@@ -1453,14 +1453,14 @@ body.bulk-wine-mode #bw-main-col { display: flex; }
       <div class="sf-checklist" id="cl-bw-vintage"><label class="all-option"><input type="checkbox" id="cl-bw-vintage-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-vintage')"> All Vintages</label></div>
     </div>
 
-    <!-- Sub-filter: Sub AVA -->
+    <!-- Sub-filter: AVA -->
     <div class="sf-head" onclick="toggleSubFilterBW('subava')">
-      <span class="sf-label">Sub AVA</span>
+      <span class="sf-label">AVA</span>
       <span class="sf-arrow" id="sf-arrow-bw-subava">▲</span>
     </div>
     <div class="sf-body" id="sf-body-bw-subava">
-      <select id="f-bw-subava" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Sub AVAs</option></select>
-      <div class="sf-checklist" id="cl-bw-subava"><label class="all-option"><input type="checkbox" id="cl-bw-subava-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-subava')"> All Sub AVAs</label></div>
+      <select id="f-bw-subava" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All AVAs</option></select>
+      <div class="sf-checklist" id="cl-bw-subava"><label class="all-option"><input type="checkbox" id="cl-bw-subava-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-subava')"> All AVAs</label></div>
     </div>
 
     <!-- Sub-filter: Grading -->
@@ -1803,7 +1803,7 @@ body.bulk-wine-mode #bw-main-col { display: flex; }
       <div class="card" id="bw-cc-subava">
         <div class="card-head">
           <span class="drag-handle" title="Drag to reorder">⠿</span>
-          <div class="card-title">Volume by Sub AVA</div>
+          <div class="card-title">Volume by AVA</div>
         </div>
         <div class="card-body">
           <div class="chart-std"><canvas id="bw-c-subava"></canvas></div>
@@ -1861,6 +1861,7 @@ body.bulk-wine-mode #bw-main-col { display: flex; }
                 <th data-col="variety" onclick="sortBWTable('variety')">Varietal</th>
                 <th data-col="subava" onclick="sortBWTable('subava')">AVA</th>
                 <th data-col="grading" onclick="sortBWTable('grading')">Grading</th>
+                <th data-col="fmv" class="r" onclick="sortBWTable('fmv')">Total FMV</th>
                 <th data-col="volume" class="r" onclick="sortBWTable('volume')">Volume (gal)</th>
                 <th data-col="owner" onclick="sortBWTable('owner')">Owner</th>
                 <th data-col="type" onclick="sortBWTable('type')">Vessel Type</th>
@@ -4208,6 +4209,13 @@ function savePrefs() {
 // ═══════════════════════════════════════════════════════════
 
 let BULK_WINE_DATA = [];
+const GRADING_LOOKUP = {"CA408":"$6.00","CA409":"$6.00","CA518":"$6.00","CA810":"$3.00","CA811":"$5.00","CA812":"$6.00","CA91":"$6.00","CBP6":"$14.00","CBP7":"$14.00","CBSB1":"$14.00","CBSB2":"$14.00","CBT12":"$14.00","CBT50":"$14.00","CBT52":"$14.00","CBT53":"$14.00","CO242":"$3.00","COP360-8":"$3.00","COP806":"$6.00","COSS31":"$6.00","MWB15":"$8.00","MWB7":"$5.00","MWBX6":"$9.00","MWDR21":"$9.00","MWH3":"$15.00","MWH5":"$9.00","MWJ10":"$8.00","MWJ2":"$9.00","MWJ5":"$6.00","MWK6":"$8.00","MWM17":"$8.00","MWM5":"$6.50","MWN1":"$8.00","MWN8":"$8.00","MWP1":"$6.00","MWP2":"$7.00","MWU11":"$8.00","MWU4":"$4.00","MWU8":"$6.50","NL101":"$4.00","NL102":"$14.00","NL103":"$4.00","NL104":"$4.00","NL105":"$14.00","NL107":"$0.00","NL108":"$4.00","NL110":"$9.00","NL112":"$0.00","NL114":"$4.00","NL115":"$4.00","NL116":"$4.00","NL117":"$4.00","NL118":"$4.00","NL119":"$4.00","NL120":"$3.00","NL122":"$3.00","NW113":"$18.00","NW114":"$3.00","NW116":"$14.00","NW124":"$18.00","NW128":"$14.00","NW314":"$18.00","NW423":"$18.00","NW68":"$18.00","NW69":"$18.00","NW81":"$18.00","NWBL01":"$12.00","NWBL02":"$14.00","NWBL03":"$15.00","NWBL04":"$14.00","NWBL05":"$14.00","NWBL06":"$14.00","NWBL10":"$15.00","NWBL13":"$15.00","NWK15954":"$18.00","P22608":"$8.00","P2608":"$8.00","P2SS8":"$4.00","PV113":"$0.00","PV115":"$0.00","PV125":"$0.00","PV127":"$5.00","PV506":"$4.00","PV514":"$5.00","PV517":"$5.00","PV559":"$5.00","PV565":"$5.00","RSSQ04":"$0.00","RSSQ05":"$0.00","RSSQ13":"$0.00","RST103":"$4.00","RST29":"$0.00","RST30":"$6.00","RST31":"$6.00","RST32":"$6.00","RST33":"$6.00","RST34":"$6.00","RST35":"$4.00","RST36":"$4.00","RSTT03":"$0.00","SFA304":"$4.00","SFC2514":"$5.00","SFC410":"$6.00","SFG3210":"$4.00","SFG3211":"$6.00","SFH3810":"$6.00","SFM802":"$4.00","SFN621":"$3.00","SFSH3301":"$4.00","SFSJ3316":"$5.00","SFSX1321":"$6.00","SFSX1322":"$3.00","SFSX6607":"$4.00","SFSX6618":"$6.00","SW001":"$7.00","SW002":"$8.00","SW003":"$6.00","SW004":"$18.00","SW005":"$7.00","SW006":"$6.00","SW009":"$7.00","SW011":"$6.50","SW012":"$18.00","SW104":"$8.00","SW111":"$6.50","SW130":"$19.00","SW131":"$6.00","SW132":"$6.00","SW201":"$7.50","SW202":"$7.00","SW204":"$7.00","SW206":"$6.50","SW208":"$6.00","SW301":"$18.00","SW302":"$7.00","SW303":"$8.00","SW304":"$8.00","SW305":"$8.00","SW306":"$8.00","SW307":"$8.00","SW308":"$6.00","SW401":"$8.00","SW403":"$8.00","SW405":"$8.00","SW406":"$6.00","SW407":"$7.50","SW411":"$8.00","SW413":"$6.50","SW416":"$8.00","SW418":"$8.00","SW419":"$7.50","SW420":"$6.50","SW422":"$8.00","SW424":"$8.00","SWBL001":"$15.00","SWBL002":"$8.00","SWBL003":"$0.00","SWBL004":"$15.00","SWBL006":"$0.00","SWBL007":"$15.00","SWBL008":"$0.00","SWBL009":"$15.00","SWBL010":"$7.50","SWBL011":"$6.00","SWBL012":"$0.00","SWBL013":"$15.00","SWBL014":"$5.00","SWBL015":"$5.00","SWBL016":"$8.00","SWBL018":"$4.00","SWBL019":"$15.00","SWBL024":"$8.00","SWBL025":"$4.00","SWBL026":"$8.00","SWBL027":"$8.00","SWBL028":"$8.00","SWBL029":"$8.00","SWBL030":"$6.00","SWPT10":"$6.50","SWPT15":"$6.50","SWPT20":"$5.00","SWPT21":"$5.00","SWPT22":"$5.00","SWPT23":"$5.00","SWPT24":"$5.00","SWPT25":"$5.00","SWPT7":"$5.00","SWPT8":"$4.00"};
+function resolveGrading(vessel) {
+  if (GRADING_LOOKUP[vessel.name]) return GRADING_LOOKUP[vessel.name];
+  const g = vessel.wineBatch?.grading;
+  if (g == null || g === '') return '—';
+  return typeof g === 'object' ? (g.valueName || g.value || g.name || '—') : String(g);
+}
 let BULK_WINE_VISIBLE = { vol: true, vessels: true, cost: true, var: true, owner: true };
 let BULK_WINE_CHARTS_VISIBLE = {
   'var-chart': true, 'owner-chart': true, 'subava-chart': true,
@@ -4326,8 +4334,8 @@ function buildBulkWineFilters() {
     if (vessel.owner?.name) filters['bw-owner'].add(vessel.owner.name);
     if (vessel.wineBatch?.designatedVariety?.name) filters['bw-variety'].add(vessel.wineBatch.designatedVariety.name);
     if (vessel.wineBatch?.vintage) filters['bw-vintage'].add(String(vessel.wineBatch.vintage));
-    if (vessel.wineBatch?.designatedSubRegion?.name) filters['bw-subava'].add(vessel.wineBatch.designatedSubRegion.name);
-    const _g = vessel.wineBatch?.grading; if (_g != null && _g !== '') filters['bw-grading'].add(typeof _g === 'object' ? (_g.valueName || _g.value || _g.name || String(_g)) : String(_g));
+    if (vessel.wineBatch?.designatedRegion?.name) filters['bw-subava'].add(vessel.wineBatch.designatedRegion.name);
+    const _gv = resolveGrading(vessel); if (_gv !== '—') filters['bw-grading'].add(_gv);
     if (vessel.ttbDetails?.taxState) filters['bw-taxstate'].add(vessel.ttbDetails.taxState);
   });
 
@@ -4392,8 +4400,8 @@ function getBulkWineFiltered() {
     if (selected['f-bw-owner']?.length > 0 && !selected['f-bw-owner'].includes(vessel.owner?.name || '')) return false;
     if (selected['f-bw-variety']?.length > 0 && !selected['f-bw-variety'].includes(vessel.wineBatch?.designatedVariety?.name || '')) return false;
     if (selected['f-bw-vintage']?.length > 0 && !selected['f-bw-vintage'].includes(String(vessel.wineBatch?.vintage || ''))) return false;
-    if (selected['f-bw-subava']?.length > 0 && !selected['f-bw-subava'].includes(vessel.wineBatch?.designatedSubRegion?.name || '')) return false;
-    if (selected['f-bw-grading']?.length > 0) { const _g = vessel.wineBatch?.grading; const _gv = (_g != null && _g !== '') ? (typeof _g === 'object' ? (_g.valueName || _g.value || _g.name || String(_g)) : String(_g)) : ''; if (!selected['f-bw-grading'].includes(_gv)) return false; }
+    if (selected['f-bw-subava']?.length > 0 && !selected['f-bw-subava'].includes(vessel.wineBatch?.designatedRegion?.name || '')) return false;
+    if (selected['f-bw-grading']?.length > 0) { const _gv = resolveGrading(vessel); if (!selected['f-bw-grading'].includes(_gv) && !(_gv === '—' && selected['f-bw-grading'].includes(''))) return false; }
     if (selected['f-bw-taxstate']?.length > 0 && !selected['f-bw-taxstate'].includes(vessel.ttbDetails?.taxState || '')) return false;
     return true;
   });
@@ -4439,8 +4447,8 @@ function renderBulkWineCharts(data) {
   renderBulkWineChart('bw-c-owner', 'bar', 'Volume by Owner', byOwner);
 
   const bySubAVA = {};
-  data.forEach(v => { const k = v.wineBatch?.designatedSubRegion?.name || 'Unknown'; bySubAVA[k] = (bySubAVA[k] || 0) + (v.volume?.value || 0); });
-  renderBulkWineChart('bw-c-subava', 'bar', 'Volume by Sub AVA', bySubAVA);
+  data.forEach(v => { const k = v.wineBatch?.designatedRegion?.name || 'Unknown'; bySubAVA[k] = (bySubAVA[k] || 0) + (v.volume?.value || 0); });
+  renderBulkWineChart('bw-c-subava', 'bar', 'Volume by AVA', bySubAVA);
 
   const byVintage = {};
   data.forEach(v => { const k = v.wineBatch?.vintage || 'Unknown'; byVintage[k] = (byVintage[k] || 0) + (v.volume?.value || 0); });
@@ -4460,7 +4468,7 @@ function renderBulkWineCharts(data) {
   renderBulkWineDoughnut('bw-c-alloc', byAlloc);
 
   const byGrade = {};
-  data.forEach(v => { const _g = v.wineBatch?.grading; const k = (_g != null && _g !== '') ? (typeof _g === 'object' ? (_g.valueName || _g.value || _g.name || 'Unknown') : String(_g)) : 'Unknown'; byGrade[k] = (byGrade[k] || 0) + (v.volume?.value || 0); });
+  data.forEach(v => { const k = resolveGrading(v); byGrade[k === '—' ? 'Unknown' : k] = (byGrade[k === '—' ? 'Unknown' : k] || 0) + (v.volume?.value || 0); });
   renderBulkWineChart('bw-c-grade', 'bar', 'Volume by Grading', byGrade);
 }
 
@@ -4509,35 +4517,41 @@ function renderBulkWineTable(data) {
   tfoot.innerHTML = '';
 
   if (data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;text-align:center;color:var(--dust);">No vessels match filters</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="padding:20px;text-align:center;color:var(--dust);">No vessels match filters</td></tr>';
     return;
   }
 
   let totalVolume = 0;
   let totalCost = 0;
+  let totalFMV = 0;
 
   data.forEach(vessel => {
     const row = document.createElement('tr');
-    row.style.cssText = 'border-bottom:1px solid var(--border);';
     const volume = vessel.volume?.value || 0;
     const costPer = (vessel.cost?.total || 0) / (volume || 1);
     totalVolume += volume;
     totalCost += vessel.cost?.total || 0;
 
-    // Grading: try numeric value first, then object with valueName, then string
-    const gradRaw = vessel.wineBatch?.grading;
-    const grading = (gradRaw != null && gradRaw !== '')
-      ? (typeof gradRaw === 'object' ? (gradRaw.valueName || gradRaw.value || gradRaw.name || '—') : String(gradRaw))
-      : '—';
+    const grading = resolveGrading(vessel);
+    const hasLookup = !!GRADING_LOOKUP[vessel.name];
+    const gradingNum = grading !== '—' ? parseFloat(grading.replace('$', '')) : 0;
+    const fmv = gradingNum * volume;
+    totalFMV += fmv;
 
-    // AVA: use designatedSubRegion (Top Sub AVA feed)
-    const ava = vessel.wineBatch?.designatedSubRegion?.name || '—';
+    // Red highlight if vessel not in grading lookup
+    row.style.cssText = hasLookup
+      ? 'border-bottom:1px solid var(--border);'
+      : 'border-bottom:1px solid var(--border);background:rgba(220,53,69,0.08);';
+
+    // AVA: use designatedRegion
+    const ava = vessel.wineBatch?.designatedRegion?.name || '—';
 
     row.innerHTML = `
       <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.vintage || '—'}</td>
       <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.designatedVariety?.name || '—'}</td>
       <td style="padding:10px 12px;color:var(--ink);">${ava}</td>
       <td style="padding:10px 12px;color:var(--ink);">${grading}</td>
+      <td style="padding:10px 12px;color:var(--ink);text-align:right;">${fmv > 0 ? '$' + fmv.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '—'}</td>
       <td style="padding:10px 12px;color:var(--ink);text-align:right;">${volume.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
       <td style="padding:10px 12px;color:var(--ink);">${vessel.owner?.name || '—'}</td>
       <td style="padding:10px 12px;color:var(--ink);">${vessel.vesselType || '—'}</td>
@@ -4555,6 +4569,7 @@ function renderBulkWineTable(data) {
   footRow.innerHTML = `
     <td style="padding:10px 12px;color:var(--ink);"><strong>Total</strong></td>
     <td></td><td></td><td></td>
+    <td style="padding:10px 12px;color:var(--ink);text-align:right;"><strong>$${totalFMV.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
     <td style="padding:10px 12px;color:var(--ink);text-align:right;"><strong>${totalVolume.toLocaleString(undefined, {maximumFractionDigits: 0})}</strong></td>
     <td></td><td></td><td></td>
     <td style="padding:10px 12px;color:var(--ink);text-align:right;"><strong>$${avgCost}</strong></td>
