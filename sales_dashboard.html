@@ -1857,16 +1857,16 @@ body.bulk-wine-mode #bw-main-col { display: flex; }
           <table>
             <thead id="bw-tbl-head">
               <tr>
-                <th data-col="name" onclick="sortBWTable('name')">Vessel</th>
-                <th data-col="type" onclick="sortBWTable('type')">Type</th>
-                <th data-col="variety" onclick="sortBWTable('variety')">Variety</th>
                 <th data-col="vintage" onclick="sortBWTable('vintage')">Vintage</th>
-                <th data-col="owner" onclick="sortBWTable('owner')">Owner</th>
-                <th data-col="subava" onclick="sortBWTable('subava')">Sub AVA</th>
-                <th data-col="volume" class="r" onclick="sortBWTable('volume')">Volume</th>
+                <th data-col="variety" onclick="sortBWTable('variety')">Varietal</th>
+                <th data-col="subava" onclick="sortBWTable('subava')">AVA</th>
                 <th data-col="grading" onclick="sortBWTable('grading')">Grading</th>
-                <th data-col="taxstate" onclick="sortBWTable('taxstate')">Tax State</th>
+                <th data-col="volume" class="r" onclick="sortBWTable('volume')">Volume (gal)</th>
+                <th data-col="owner" onclick="sortBWTable('owner')">Owner</th>
+                <th data-col="type" onclick="sortBWTable('type')">Vessel Type</th>
+                <th data-col="name" onclick="sortBWTable('name')">Vessel ID</th>
                 <th data-col="cost" class="r" onclick="sortBWTable('cost')">Cost/Gal</th>
+                <th data-col="taxstate" onclick="sortBWTable('taxstate')">Tax State</th>
               </tr>
             </thead>
             <tbody id="bw-table-body">
@@ -3266,7 +3266,7 @@ function render_table(data) {
 
   const totalRow = `
     <tr style="background:var(--parchment2);font-weight:500;border-top:2px solid var(--border);">
-      <td><em>Total</em></td>
+      <td>Total</td>
       <td></td><td></td><td></td><td></td>
       <td class="r">${fmtN(totAcres)}</td>
       <td class="r">${fmtN(totTons)}</td>
@@ -4240,11 +4240,13 @@ function switchMode(mode) {
   }
 }
 
-async function fetchBulkWineData() {
+async function fetchBulkWineData(silent) {
   try {
-    document.getElementById('load-status').textContent = 'Fetching bulk wine inventory...';
-    document.getElementById('loading-overlay').style.display = 'flex';
-    document.getElementById('loading-overlay').classList.remove('fade-out');
+    if (!silent) {
+      document.getElementById('load-status').textContent = 'Fetching bulk wine inventory...';
+      document.getElementById('loading-overlay').style.display = 'flex';
+      document.getElementById('loading-overlay').classList.remove('fade-out');
+    }
 
     const allResults = [];
     let offset = 0;
@@ -4266,7 +4268,7 @@ async function fetchBulkWineData() {
       if (json.results && json.results.length > 0) {
         allResults.push(...json.results);
         offset += json.results.length;
-        document.getElementById('load-status').textContent = `Fetching bulk wine inventory... ${allResults.length} vessels`;
+        if (!silent) document.getElementById('load-status').textContent = `Fetching bulk wine inventory... ${allResults.length} vessels`;
         hasMore = json.results.length === pageSize;
       } else {
         hasMore = false;
@@ -4276,32 +4278,37 @@ async function fetchBulkWineData() {
     BULK_WINE_DATA = allResults;
     BW_DATA_FETCHED = true;
     console.log(`Loaded ${BULK_WINE_DATA.length} bulk wine vessels`);
+    if (BULK_WINE_DATA.length > 0) console.log('Sample vessel:', JSON.stringify(BULK_WINE_DATA[0], null, 2));
     buildBulkWineFilters();
-    renderBulkWineDashboard();
+    // Only render if currently in wine mode
+    if (BW_CURRENT_MODE === 'wine') renderBulkWineDashboard();
 
-    document.getElementById('loading-overlay').classList.add('fade-out');
-    setTimeout(() => { document.getElementById('loading-overlay').style.display = 'none'; }, 500);
+    if (!silent) {
+      document.getElementById('loading-overlay').classList.add('fade-out');
+      setTimeout(() => { document.getElementById('loading-overlay').style.display = 'none'; }, 500);
+    }
   } catch (err) {
     console.error('Error fetching bulk wine data:', err);
-    const overlay = document.getElementById('loading-overlay');
-    const errDiv = document.getElementById('load-error');
 
     const isCORS = err.message === 'Failed to fetch' || err.name === 'TypeError';
     const msg = isCORS
       ? `<strong>CORS Error — Cross-Origin Request Blocked</strong><br><br>The Vintrace API at <code>us57.vintrace.net</code> does not allow requests from this domain.<br><br><strong>To fix:</strong> Deploy the included <code>vintrace-proxy-worker.js</code> as a Cloudflare Worker (free), then paste the worker URL into the <code>PROXY_BASE</code> variable in this file.`
       : `<strong>Bulk Wine Data Error:</strong><br>${err.message}`;
 
-    errDiv.style.display = 'block';
-    errDiv.innerHTML = msg;
-
     const banner = document.getElementById('bw-error-banner');
     if (banner) { banner.style.display = 'block'; banner.innerHTML = msg; }
 
-    overlay.classList.remove('fade-out');
-    setTimeout(() => {
-      overlay.classList.add('fade-out');
-      setTimeout(() => { overlay.style.display = 'none'; }, 600);
-    }, 4000);
+    if (!silent) {
+      const overlay = document.getElementById('loading-overlay');
+      const errDiv = document.getElementById('load-error');
+      errDiv.style.display = 'block';
+      errDiv.innerHTML = msg;
+      overlay.classList.remove('fade-out');
+      setTimeout(() => {
+        overlay.classList.add('fade-out');
+        setTimeout(() => { overlay.style.display = 'none'; }, 600);
+      }, 4000);
+    }
   }
 }
 
@@ -4320,7 +4327,7 @@ function buildBulkWineFilters() {
     if (vessel.wineBatch?.designatedVariety?.name) filters['bw-variety'].add(vessel.wineBatch.designatedVariety.name);
     if (vessel.wineBatch?.vintage) filters['bw-vintage'].add(String(vessel.wineBatch.vintage));
     if (vessel.wineBatch?.designatedSubRegion?.name) filters['bw-subava'].add(vessel.wineBatch.designatedSubRegion.name);
-    if (vessel.wineBatch?.grading?.valueName) filters['bw-grading'].add(vessel.wineBatch.grading.valueName);
+    const _g = vessel.wineBatch?.grading; if (_g != null && _g !== '') filters['bw-grading'].add(typeof _g === 'object' ? (_g.valueName || _g.value || _g.name || String(_g)) : String(_g));
     if (vessel.ttbDetails?.taxState) filters['bw-taxstate'].add(vessel.ttbDetails.taxState);
   });
 
@@ -4386,7 +4393,7 @@ function getBulkWineFiltered() {
     if (selected['f-bw-variety']?.length > 0 && !selected['f-bw-variety'].includes(vessel.wineBatch?.designatedVariety?.name || '')) return false;
     if (selected['f-bw-vintage']?.length > 0 && !selected['f-bw-vintage'].includes(String(vessel.wineBatch?.vintage || ''))) return false;
     if (selected['f-bw-subava']?.length > 0 && !selected['f-bw-subava'].includes(vessel.wineBatch?.designatedSubRegion?.name || '')) return false;
-    if (selected['f-bw-grading']?.length > 0 && !selected['f-bw-grading'].includes(vessel.wineBatch?.grading?.valueName || '')) return false;
+    if (selected['f-bw-grading']?.length > 0) { const _g = vessel.wineBatch?.grading; const _gv = (_g != null && _g !== '') ? (typeof _g === 'object' ? (_g.valueName || _g.value || _g.name || String(_g)) : String(_g)) : ''; if (!selected['f-bw-grading'].includes(_gv)) return false; }
     if (selected['f-bw-taxstate']?.length > 0 && !selected['f-bw-taxstate'].includes(vessel.ttbDetails?.taxState || '')) return false;
     return true;
   });
@@ -4453,7 +4460,7 @@ function renderBulkWineCharts(data) {
   renderBulkWineDoughnut('bw-c-alloc', byAlloc);
 
   const byGrade = {};
-  data.forEach(v => { const k = v.wineBatch?.grading?.valueName || 'Unknown'; byGrade[k] = (byGrade[k] || 0) + (v.volume?.value || 0); });
+  data.forEach(v => { const _g = v.wineBatch?.grading; const k = (_g != null && _g !== '') ? (typeof _g === 'object' ? (_g.valueName || _g.value || _g.name || 'Unknown') : String(_g)) : 'Unknown'; byGrade[k] = (byGrade[k] || 0) + (v.volume?.value || 0); });
   renderBulkWineChart('bw-c-grade', 'bar', 'Volume by Grading', byGrade);
 }
 
@@ -4491,7 +4498,7 @@ function renderBulkWineDoughnut(canvasId, dataObj) {
   BW_CHARTS[canvasId] = new Chart(canvas, {
     type: 'doughnut',
     data: { labels, datasets: [{ data: values, backgroundColor: colors.slice(0, labels.length).map((c, i) => colors[i % colors.length]), borderColor: 'white', borderWidth: 2 }] },
-    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { family: "'DM Mono', monospace", size: 9 } } } } }
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'right', labels: { font: { family: "'DM Mono', monospace", size: 9 }, boxWidth: 10, padding: 6 } } } }
   });
 }
 
@@ -4517,30 +4524,41 @@ function renderBulkWineTable(data) {
     totalVolume += volume;
     totalCost += vessel.cost?.total || 0;
 
+    // Grading: try numeric value first, then object with valueName, then string
+    const gradRaw = vessel.wineBatch?.grading;
+    const grading = (gradRaw != null && gradRaw !== '')
+      ? (typeof gradRaw === 'object' ? (gradRaw.valueName || gradRaw.value || gradRaw.name || '—') : String(gradRaw))
+      : '—';
+
+    // AVA: use designatedSubRegion (Top Sub AVA feed)
+    const ava = vessel.wineBatch?.designatedSubRegion?.name || '—';
+
     row.innerHTML = `
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.name || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.vesselType || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.designatedVariety?.name || '—'}</td>
       <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.vintage || '—'}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.designatedVariety?.name || '—'}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${ava}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${grading}</td>
+      <td style="padding:10px 12px;color:var(--ink);text-align:right;">${volume.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
       <td style="padding:10px 12px;color:var(--ink);">${vessel.owner?.name || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.designatedSubRegion?.name || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);text-align:right;">${volume.toLocaleString(undefined, {maximumFractionDigits: 1})} ${vessel.volume?.unit || 'L'}</td>
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.grading?.valueName || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);">${vessel.ttbDetails?.taxState || '—'}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${vessel.vesselType || '—'}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${vessel.name || '—'}</td>
       <td style="padding:10px 12px;color:var(--ink);text-align:right;">$${costPer.toFixed(2)}</td>
+      <td style="padding:10px 12px;color:var(--ink);">${vessel.ttbDetails?.taxState || '—'}</td>
     `;
     tbody.appendChild(row);
   });
 
-  // Add totals row
+  // Add totals row — "Total" at far left
   const footRow = document.createElement('tr');
   footRow.style.cssText = 'background:var(--parchment);border-top:2px solid var(--border);font-weight:500;';
+  const avgCost = totalVolume > 0 ? (totalCost / totalVolume).toFixed(2) : '0.00';
   footRow.innerHTML = `
-    <td colspan="6" style="padding:10px 12px;color:var(--ink);text-align:right;"><strong>TOTALS</strong></td>
-    <td style="padding:10px 12px;color:var(--ink);text-align:right;"><strong>${totalVolume.toLocaleString(undefined, {maximumFractionDigits: 1})} L</strong></td>
-    <td style="padding:10px 12px;color:var(--ink);"></td>
-    <td style="padding:10px 12px;color:var(--ink);"></td>
-    <td style="padding:10px 12px;color:var(--ink);text-align:right;"><strong>$${(totalCost / (totalVolume || 1)).toFixed(2)}</strong></td>
+    <td style="padding:10px 12px;color:var(--ink);"><strong>Total</strong></td>
+    <td></td><td></td><td></td>
+    <td style="padding:10px 12px;color:var(--ink);text-align:right;"><strong>${totalVolume.toLocaleString(undefined, {maximumFractionDigits: 0})}</strong></td>
+    <td></td><td></td><td></td>
+    <td style="padding:10px 12px;color:var(--ink);text-align:right;"><strong>$${avgCost}</strong></td>
+    <td></td>
   `;
   tfoot.appendChild(footRow);
 }
@@ -4743,6 +4761,9 @@ function restoreFilterSelections() {
 // Start
 loadPrefs();   // restore KPI/chart/toggle state before first render
 loadData();
+
+// Pre-fetch Bulk Wine data in parallel so it's ready when user switches tabs
+fetchBulkWineData(true);
 
 // Auto-refresh every 15 minutes
 setInterval(refreshData, 15 * 60 * 1000);
