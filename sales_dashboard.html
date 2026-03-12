@@ -4265,7 +4265,13 @@ let BW_CHARTS = {};
 let BW_CURRENT_MODE = 'grape';
 let BW_DATA_FETCHED = false;
 
-const VINTRACE_API_BASE = 'https://us57.vintrace.net';
+// ── Vintrace API config ──
+// PROXY_BASE: Set to your Cloudflare Worker URL after deploying vintrace-proxy-worker.js
+//   e.g. 'https://vintrace-proxy.yourname.workers.dev'
+// When set, requests go through the proxy (no CORS, token stays server-side).
+// When empty, requests go direct to Vintrace (only works same-origin).
+const PROXY_BASE = 'https://bulk-wine.newhall.workers.dev';
+const VINTRACE_API_BASE = PROXY_BASE || 'https://us57.vintrace.net';
 const VINTRACE_API_TOKEN = 'k51oMu1Q5Utpyxwom_XFYCzn0la5EuSD5-sDAVd6NRpiP5n-Rh9bkHdkEKlX';
 const VINTRACE_ENDPOINT = '/grapevine/api/v7/report/vessel-details-report';
 
@@ -4314,12 +4320,10 @@ async function fetchBulkWineData() {
 
     while (hasMore) {
       const url = `${VINTRACE_API_BASE}${VINTRACE_ENDPOINT}?offset=${offset}&limit=${pageSize}&extraFields=allocations,composition`;
-      const resp = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${VINTRACE_API_TOKEN}`,
-          'Accept': 'application/json'
-        }
-      });
+      const fetchHeaders = { 'Accept': 'application/json' };
+      // Only send token directly when NOT using the proxy (proxy adds it server-side)
+      if (!PROXY_BASE) fetchHeaders['Authorization'] = `Bearer ${VINTRACE_API_TOKEN}`;
+      const resp = await fetch(url, { headers: fetchHeaders });
 
       if (!resp.ok) {
         const text = await resp.text();
@@ -4354,7 +4358,7 @@ async function fetchBulkWineData() {
     const msg = isCORS
       ? `<strong>CORS Error — Cross-Origin Request Blocked</strong><br><br>
          The Vintrace API at <code>us57.vintrace.net</code> does not allow requests from this domain.<br><br>
-         <strong>To fix:</strong> Host this dashboard on the Vintrace domain, use a CORS proxy, or ask Vintrace support to whitelist your GitHub Pages domain in their CORS headers.`
+         <strong>To fix:</strong> Deploy the included <code>vintrace-proxy-worker.js</code> as a Cloudflare Worker (free), then paste the worker URL into the <code>PROXY_BASE</code> variable near line 4270 of this file.`
       : `<strong>Bulk Wine Data Error:</strong><br>${err.message}`;
 
     errDiv.style.display = 'block';
