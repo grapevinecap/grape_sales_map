@@ -1705,6 +1705,9 @@ body.sidebar-open {
   <div class="main-col" id="bw-main-col">
   <main class="content" id="bw-main-content">
 
+    <!-- Error banner (hidden by default) -->
+    <div id="bw-error-banner" style="display:none;background:#6b1f2a;color:#f5f0e8;padding:16px 20px;border-radius:12px;margin-bottom:16px;font-size:13px;line-height:1.5;"></div>
+
     <!-- TAB SWITCHER (Bulk Wine has only Metrics, no Map) -->
     <div class="view-tabs">
       <button class="view-tab active" id="bw-tab-btn-dashboard" onclick="switchTab('bw-dashboard')">Metrics</button>
@@ -4310,7 +4313,7 @@ async function fetchBulkWineData() {
     let hasMore = true;
 
     while (hasMore) {
-      const url = `${VINTRACE_API_BASE}${VINTRACE_ENDPOINT}?offset=${offset}&limit=${pageSize}&allocations=true&composition=true`;
+      const url = `${VINTRACE_API_BASE}${VINTRACE_ENDPOINT}?offset=${offset}&limit=${pageSize}&extraFields=allocations,composition`;
       const resp = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${VINTRACE_API_TOKEN}`,
@@ -4345,15 +4348,39 @@ async function fetchBulkWineData() {
     console.error('Error fetching bulk wine data:', err);
     const overlay = document.getElementById('loading-overlay');
     const errDiv = document.getElementById('load-error');
+
+    // Determine if this is likely a CORS error
+    const isCORS = err.message === 'Failed to fetch' || err.name === 'TypeError';
+    const msg = isCORS
+      ? `<strong>CORS Error — Cross-Origin Request Blocked</strong><br><br>
+         The Vintrace API at <code>us57.vintrace.net</code> does not allow requests from this domain.<br><br>
+         <strong>To fix:</strong> Host this dashboard on the Vintrace domain, use a CORS proxy, or ask Vintrace support to whitelist your GitHub Pages domain in their CORS headers.`
+      : `<strong>Bulk Wine Data Error:</strong><br>${err.message}`;
+
     errDiv.style.display = 'block';
-    errDiv.innerHTML = `<strong>Bulk Wine Data Error:</strong><br>${err.message}<br><br>Note: API access may require same-origin setup from vintrace.net domain.`;
-    setTimeout(() => { overlay.classList.add('fade-out'); }, 3000);
+    errDiv.innerHTML = msg;
+
+    // Also show persistent error banner in the bulk wine main area
+    const banner = document.getElementById('bw-error-banner');
+    if (banner) {
+      banner.style.display = 'block';
+      banner.innerHTML = msg;
+    }
+
+    // Ensure loading overlay hides properly so the error banner is visible
+    overlay.classList.remove('fade-out');
+    setTimeout(() => {
+      overlay.classList.add('fade-out');
+      setTimeout(() => { overlay.style.display = 'none'; }, 600);
+    }, 4000);
   }
 }
 
 function parseBulkWineRows() {
-  // Parse vessel data from Vintrace API response
-  // Data is already in the expected format from API
+  // Vintrace API returns vessel objects that the render functions consume directly.
+  // No transformation needed — volume, owner, wineBatch, allocations, cost, ttbDetails
+  // are accessed as-is from each vessel object in BULK_WINE_DATA.
+  console.log(`Parsed ${BULK_WINE_DATA.length} bulk wine vessels`);
 }
 
 function buildBulkWineFilters() {
