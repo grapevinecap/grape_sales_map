@@ -543,7 +543,7 @@ header {
 /* ── UNIFORM CARD HEIGHT ── */
 /* Every chart card is the same total height */
 .chart-slot .card {
-  cursor: grab; user-select: none;
+  cursor: default; user-select: none;
   transition: box-shadow 0.15s, opacity 0.15s;
   height: 360px;        /* total card height = header + body */
   display: flex;
@@ -562,6 +562,8 @@ header {
   flex-direction: column;
   overflow: hidden;
 }
+/* Force default cursor on chart canvases (override Chart.js pointer on hover) */
+canvas { cursor: default !important; }
 /* Chart canvases fill available card body */
 .chart-slot .card .card-body > div[class^="chart-"],
 .chart-slot .card .card-body > div[class*=" chart-"] {
@@ -573,14 +575,14 @@ header {
   flex: 1; max-height: none; overflow-y: auto;
 }
 
-.chart-slot .card:active { cursor: grabbing; }
+.chart-slot .card:active { cursor: default; }
 .chart-slot.dragging { opacity: 0.4; }
 .chart-slot.drag-over .card {
   box-shadow: 0 0 0 2px var(--wine), var(--shadow-md);
 }
 /* drag handle in card-head */
 .drag-handle {
-  color: var(--border); font-size: 14px; cursor: grab;
+  color: var(--border); font-size: 14px; cursor: default;
   padding: 0 6px 0 0; line-height: 1;
   transition: color 0.15s;
 }
@@ -625,6 +627,28 @@ header {
 #section-filters.open {
   flex: 1;
   max-height: none !important; /* override .collapsible-body */
+  opacity: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Bulk Wine sidebar section open states ── */
+#section-bw-widgets.open {
+  max-height: 200px;
+  opacity: 1;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+#section-bw-charts.open {
+  max-height: 260px;
+  opacity: 1;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+#section-bw-filters.open {
+  flex: 1;
+  max-height: none !important;
   opacity: 1;
   overflow-y: auto;
   display: flex;
@@ -1013,6 +1037,8 @@ body.sidebar-open {
   /* Expand max-height caps to fit taller buttons */
   #section-widgets.open { max-height: 340px; }   /* 5 × ~44px + gaps */
   #section-charts.open  { max-height: 420px; }   /* 7 × ~44px + gaps */
+  #section-bw-widgets.open { max-height: 340px; }
+  #section-bw-charts.open  { max-height: 420px; }
 }
 
 /* ════════════════════════════════════════════════════
@@ -1707,7 +1733,7 @@ body.bulk-wine-mode #bw-main-col { display: flex; }
 
   <!-- TAB SWITCHER (Bulk Wine has only Metrics, no Map) -->
   <div class="view-tabs">
-    <button class="tab-btn active">Metrics</button>
+    <button class="view-tab active">Metrics</button>
   </div>
 
   <!-- KPI GRID -->
@@ -1855,7 +1881,7 @@ body.bulk-wine-mode #bw-main-col { display: flex; }
 
 </main>
   <footer>
-    <span>Grapevine Capital · Bulk Wine Inventory · SharePoint Live</span>
+    <span>Grapevine Capital · Bulk Wine Inventory · Vintrace Live</span>
     <span>Showing <span class="footer-count" id="bw-footer-count">—</span> records</span>
   </footer>
 </div><!-- /.bw-main-col -->
