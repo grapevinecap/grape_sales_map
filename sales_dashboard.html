@@ -1145,7 +1145,13 @@ body.sidebar-open {
 .map-extent-btn:hover { background: #f4f4f4; }
 
 /* ── MODE TOGGLE ── */
-.mode-toggle { display:flex;gap:6px;margin-left:auto; }
+.mode-toggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
 .mode-btn {
   padding:6px 16px;border-radius:20px;border:1px solid var(--border);
   background:transparent;color:var(--dust);font:600 11px/1 'DM Mono',monospace;
@@ -1196,14 +1202,14 @@ body.bulk-wine-mode #bw-main-col { display: flex; }
       <div class="subtitle" id="header-subtitle">2026 Vintage</div>
     </div>
   </div>
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="mode-grape" onclick="switchMode('grape')">Grape Sales</button>
+    <button class="mode-btn" id="mode-wine" onclick="switchMode('wine')">Bulk Wine</button>
+  </div>
   <div class="header-right">
     <div class="live-badge"><span class="live-dot"></span><span id="live-badge-text">Live · SharePoint</span></div>
     <div class="sync-time" id="sync-time">—</div>
     <button class="refresh-btn" id="refresh-btn" onclick="refreshData()"><span class="refresh-icon">↺</span> <span class="refresh-label">Refresh</span></button>
-    <div class="mode-toggle">
-      <button class="mode-btn active" id="mode-grape" onclick="switchMode('grape')">Grape Sales</button>
-      <button class="mode-btn" id="mode-wine" onclick="switchMode('wine')">Bulk Wine</button>
-    </div>
   </div>
 </header>
 <!-- Mobile sidebar overlay backdrop -->
@@ -1345,71 +1351,110 @@ body.bulk-wine-mode #bw-main-col { display: flex; }
 
 <!-- ═══ BULK WINE SIDEBAR ═══ -->
 <aside class="sidebar" id="bw-sidebar">
-  <!-- Widgets section -->
-  <div class="sidebar-section">
-    <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <span class="section-title">Widgets</span>
-      <span class="section-chevron">▾</span>
-    </div>
-    <div class="section-body">
-      <button class="vis-btn active" id="vis-bw-vol" onclick="toggleWidgetBW('vol')">Volume</button>
-      <button class="vis-btn active" id="vis-bw-vessels" onclick="toggleWidgetBW('vessels')">Vessels</button>
-      <button class="vis-btn active" id="vis-bw-cost" onclick="toggleWidgetBW('cost')">Cost/Gal</button>
-      <button class="vis-btn active" id="vis-bw-var" onclick="toggleWidgetBW('var')">Varieties</button>
-      <button class="vis-btn active" id="vis-bw-owner" onclick="toggleWidgetBW('owner')">Top Owner</button>
-    </div>
+  <div class="sidebar-head">
+    <span>Customize</span>
+    <button class="hamburger hamburger-fixed" id="hamburger-fixed-bw" onclick="toggleMobileSidebar()" aria-label="Close filters">
+      <span></span><span></span><span></span>
+    </button>
   </div>
 
-  <!-- Charts section -->
-  <div class="sidebar-section">
-    <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <span class="section-title">Charts</span>
-      <span class="section-chevron">▾</span>
-    </div>
-    <div class="section-body">
-      <button class="vis-btn active" id="vis-bw-var-chart" onclick="toggleChartBW('var-chart')">Variety</button>
-      <button class="vis-btn active" id="vis-bw-owner-chart" onclick="toggleChartBW('owner-chart')">Owner</button>
-      <button class="vis-btn active" id="vis-bw-subava-chart" onclick="toggleChartBW('subava-chart')">Sub AVA</button>
-      <button class="vis-btn active" id="vis-bw-vintage-chart" onclick="toggleChartBW('vintage-chart')">Vintage</button>
-      <button class="vis-btn active" id="vis-bw-alloc-chart" onclick="toggleChartBW('alloc-chart')">Allocation</button>
-      <button class="vis-btn active" id="vis-bw-grade-chart" onclick="toggleChartBW('grade-chart')">Grading</button>
-    </div>
+  <!-- Collapsible: Widgets -->
+  <div id="section-group-bw-widgets">
+  <div class="sidebar-section-head collapsible-head" onclick="toggleSectionBW('bw-widgets')" style="border-top:none;">
+    <span>Widgets</span><span class="collapse-arrow" id="arrow-bw-widgets">▲</span>
+  </div>
+  <div class="collapsible-body" id="section-bw-widgets">
+    <button class="vis-btn" id="vis-bw-vol"     onclick="toggleWidgetBW('vol')">     <span class="vis-dot"></span>Volume</button>
+    <button class="vis-btn" id="vis-bw-vessels" onclick="toggleWidgetBW('vessels')"> <span class="vis-dot"></span>Vessels</button>
+    <button class="vis-btn" id="vis-bw-cost"    onclick="toggleWidgetBW('cost')">    <span class="vis-dot"></span>Cost/Gal</button>
+    <button class="vis-btn" id="vis-bw-var"     onclick="toggleWidgetBW('var')">     <span class="vis-dot"></span>Varieties</button>
+    <button class="vis-btn" id="vis-bw-owner"   onclick="toggleWidgetBW('owner')">   <span class="vis-dot"></span>Top Owner</button>
+  </div>
   </div>
 
-  <!-- Filters section -->
-  <div class="sidebar-section">
-    <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
-      <span class="section-title">Filters</span>
-      <span class="section-chevron">▾</span>
+  <!-- Collapsible: Charts -->
+  <div id="section-group-bw-charts">
+  <div class="sidebar-section-head collapsible-head" onclick="toggleSectionBW('bw-charts')">
+    <span>Charts</span><span class="collapse-arrow" id="arrow-bw-charts">▲</span>
+  </div>
+  <div class="collapsible-body" id="section-bw-charts">
+    <button class="vis-btn" id="vis-bw-var-chart"    onclick="toggleChartBW('var-chart')">    <span class="vis-dot"></span>Variety</button>
+    <button class="vis-btn" id="vis-bw-owner-chart"  onclick="toggleChartBW('owner-chart')">  <span class="vis-dot"></span>Owner</button>
+    <button class="vis-btn" id="vis-bw-subava-chart" onclick="toggleChartBW('subava-chart')"> <span class="vis-dot"></span>Sub AVA</button>
+    <button class="vis-btn" id="vis-bw-vintage-chart" onclick="toggleChartBW('vintage-chart')"><span class="vis-dot"></span>Vintage</button>
+    <button class="vis-btn" id="vis-bw-alloc-chart"  onclick="toggleChartBW('alloc-chart')">  <span class="vis-dot"></span>Allocation</button>
+    <button class="vis-btn" id="vis-bw-grade-chart"  onclick="toggleChartBW('grade-chart')">  <span class="vis-dot"></span>Grading</button>
+  </div>
+  </div>
+
+  <!-- Collapsible: Filters -->
+  <div class="sidebar-section-head collapsible-head" onclick="toggleSectionBW('bw-filters')">
+    <span>Filters</span>
+    <div style="display:flex;align-items:center;gap:0;">
+      <button class="reset-btn-inline" id="reset-btn-bw" onclick="event.stopPropagation();doResetBW();"><img src="data:image/png;base64,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" width="11" height="11" style="flex-shrink:0;" alt="reset">Reset</button>
+      <span style="display:inline-block;width:14px;"></span>
+      <span class="collapse-arrow" id="arrow-bw-filters">▲</span>
     </div>
-    <div class="section-body">
-      <div class="sf-group"><label class="sf-label">Owner</label>
-        <select id="f-bw-owner" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Owners</option></select>
-        <div class="sf-checklist" id="cl-bw-owner"><label class="all-option"><input type="checkbox" id="cl-bw-owner-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-owner')"> All Owners</label></div>
-      </div>
-      <div class="sf-group"><label class="sf-label">Variety</label>
-        <select id="f-bw-variety" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Varieties</option></select>
-        <div class="sf-checklist" id="cl-bw-variety"><label class="all-option"><input type="checkbox" id="cl-bw-variety-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-variety')"> All Varieties</label></div>
-      </div>
-      <div class="sf-group"><label class="sf-label">Vintage</label>
-        <select id="f-bw-vintage" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Vintages</option></select>
-        <div class="sf-checklist" id="cl-bw-vintage"><label class="all-option"><input type="checkbox" id="cl-bw-vintage-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-vintage')"> All Vintages</label></div>
-      </div>
-      <div class="sf-group"><label class="sf-label">Sub AVA</label>
-        <select id="f-bw-subava" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Sub AVAs</option></select>
-        <div class="sf-checklist" id="cl-bw-subava"><label class="all-option"><input type="checkbox" id="cl-bw-subava-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-subava')"> All Sub AVAs</label></div>
-      </div>
-      <div class="sf-group"><label class="sf-label">Grading</label>
-        <select id="f-bw-grading" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Gradings</option></select>
-        <div class="sf-checklist" id="cl-bw-grading"><label class="all-option"><input type="checkbox" id="cl-bw-grading-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-grading')"> All Gradings</label></div>
-      </div>
-      <div class="sf-group"><label class="sf-label">Tax State</label>
-        <select id="f-bw-taxstate" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Tax States</option></select>
-        <div class="sf-checklist" id="cl-bw-taxstate"><label class="all-option"><input type="checkbox" id="cl-bw-taxstate-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-taxstate')"> All Tax States</label></div>
-      </div>
-      <div style="text-align:center;margin-top:10px;">
-        <button onclick="doResetBW()" style="background:var(--wine);color:var(--cream);border:none;padding:8px 20px;border-radius:20px;cursor:pointer;font:600 11px/1 'DM Mono',monospace;">Reset Filters</button>
-      </div>
+  </div>
+  <div class="collapsible-body" id="section-bw-filters">
+    <!-- Sub-filter: Owner -->
+    <div class="sf-head" onclick="toggleSubFilterBW('owner')">
+      <span class="sf-label">Owner</span>
+      <span class="sf-arrow" id="sf-arrow-bw-owner">▲</span>
+    </div>
+    <div class="sf-body" id="sf-body-bw-owner">
+      <select id="f-bw-owner" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Owners</option></select>
+      <div class="sf-checklist" id="cl-bw-owner"><label class="all-option"><input type="checkbox" id="cl-bw-owner-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-owner')"> All Owners</label></div>
+    </div>
+
+    <!-- Sub-filter: Variety -->
+    <div class="sf-head" onclick="toggleSubFilterBW('variety')">
+      <span class="sf-label">Variety</span>
+      <span class="sf-arrow" id="sf-arrow-bw-variety">▲</span>
+    </div>
+    <div class="sf-body" id="sf-body-bw-variety">
+      <select id="f-bw-variety" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Varieties</option></select>
+      <div class="sf-checklist" id="cl-bw-variety"><label class="all-option"><input type="checkbox" id="cl-bw-variety-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-variety')"> All Varieties</label></div>
+    </div>
+
+    <!-- Sub-filter: Vintage -->
+    <div class="sf-head" onclick="toggleSubFilterBW('vintage')">
+      <span class="sf-label">Vintage</span>
+      <span class="sf-arrow" id="sf-arrow-bw-vintage">▲</span>
+    </div>
+    <div class="sf-body" id="sf-body-bw-vintage">
+      <select id="f-bw-vintage" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Vintages</option></select>
+      <div class="sf-checklist" id="cl-bw-vintage"><label class="all-option"><input type="checkbox" id="cl-bw-vintage-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-vintage')"> All Vintages</label></div>
+    </div>
+
+    <!-- Sub-filter: Sub AVA -->
+    <div class="sf-head" onclick="toggleSubFilterBW('subava')">
+      <span class="sf-label">Sub AVA</span>
+      <span class="sf-arrow" id="sf-arrow-bw-subava">▲</span>
+    </div>
+    <div class="sf-body" id="sf-body-bw-subava">
+      <select id="f-bw-subava" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Sub AVAs</option></select>
+      <div class="sf-checklist" id="cl-bw-subava"><label class="all-option"><input type="checkbox" id="cl-bw-subava-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-subava')"> All Sub AVAs</label></div>
+    </div>
+
+    <!-- Sub-filter: Grading -->
+    <div class="sf-head" onclick="toggleSubFilterBW('grading')">
+      <span class="sf-label">Grading</span>
+      <span class="sf-arrow" id="sf-arrow-bw-grading">▲</span>
+    </div>
+    <div class="sf-body" id="sf-body-bw-grading">
+      <select id="f-bw-grading" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Gradings</option></select>
+      <div class="sf-checklist" id="cl-bw-grading"><label class="all-option"><input type="checkbox" id="cl-bw-grading-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-grading')"> All Gradings</label></div>
+    </div>
+
+    <!-- Sub-filter: Tax State -->
+    <div class="sf-head" onclick="toggleSubFilterBW('taxstate')">
+      <span class="sf-label">Tax State</span>
+      <span class="sf-arrow" id="sf-arrow-bw-taxstate">▲</span>
+    </div>
+    <div class="sf-body" id="sf-body-bw-taxstate">
+      <select id="f-bw-taxstate" multiple onchange="renderBulkWineDashboard()"><option value="__all__" selected>All Tax States</option></select>
+      <div class="sf-checklist" id="cl-bw-taxstate"><label class="all-option"><input type="checkbox" id="cl-bw-taxstate-all" value="__all__" checked onchange="bwToggleAll(this,'cl-bw-taxstate')"> All Tax States</label></div>
     </div>
   </div>
 </aside>
@@ -1667,97 +1712,150 @@ body.bulk-wine-mode #bw-main-col { display: flex; }
 
   <!-- KPI GRID -->
   <div class="kpi-grid" id="bw-kpi-grid">
-    <div class="kpi-card">
-      <div class="kpi-label">Total Volume (gal)</div>
-      <div class="kpi-val" id="bw-k-vol">—</div>
-      <div class="kpi-breakdown" id="bw-k-vol-breakdown"></div>
+    <div class="kpi" data-bw-kpi="vol">
+      <div class="kpi-lbl">Total Volume (gal)</div>
+      <div class="kpi-body">
+        <div class="kpi-val" id="bw-k-vol">—</div>
+        <div class="kpi-breakdown" id="bw-k-vol-breakdown"></div>
+      </div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Vessels</div>
-      <div class="kpi-val" id="bw-k-vessels">—</div>
-      <div class="kpi-breakdown" id="bw-k-vessels-breakdown"></div>
+    <div class="kpi k-sage" data-bw-kpi="vessels">
+      <div class="kpi-lbl">Vessels</div>
+      <div class="kpi-body">
+        <div class="kpi-val" id="bw-k-vessels">—</div>
+        <div class="kpi-breakdown" id="bw-k-vessels-breakdown"></div>
+      </div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Avg Cost / Gal</div>
-      <div class="kpi-val" id="bw-k-cost">—</div>
-      <div class="kpi-breakdown" id="bw-k-cost-breakdown"></div>
+    <div class="kpi k-dust" data-bw-kpi="cost">
+      <div class="kpi-lbl">Avg Cost / Gal</div>
+      <div class="kpi-body">
+        <div class="kpi-val" id="bw-k-cost">—</div>
+        <div class="kpi-breakdown" id="bw-k-cost-breakdown"></div>
+      </div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Varieties</div>
-      <div class="kpi-val" id="bw-k-var">—</div>
-      <div class="kpi-breakdown" id="bw-k-var-breakdown"></div>
+    <div class="kpi k-gold" data-bw-kpi="var">
+      <div class="kpi-lbl">Varieties</div>
+      <div class="kpi-body">
+        <div class="kpi-val" id="bw-k-var">—</div>
+        <div class="kpi-breakdown" id="bw-k-var-breakdown"></div>
+      </div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Top Owner</div>
-      <div class="kpi-val" id="bw-k-owner">—</div>
-      <div class="kpi-breakdown" id="bw-k-owner-breakdown"></div>
+    <div class="kpi k-wine2" data-bw-kpi="owner">
+      <div class="kpi-lbl">Top Owner</div>
+      <div class="kpi-body">
+        <div class="kpi-val" id="bw-k-owner">—</div>
+        <div class="kpi-breakdown" id="bw-k-owner-breakdown"></div>
+      </div>
     </div>
   </div>
 
   <!-- CHART GRID -->
-  <div class="chart-grid" id="bw-chart-grid">
-    <div class="chart-card" id="bw-cc-var">
-      <div class="chart-title-bar"><span class="chart-title">Volume by Variety</span></div>
-      <div class="chart-body">
-        <div class="chart-h-ava"><canvas id="bw-c-var"></canvas></div>
+  <div id="bw-chart-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px;">
+    <div class="chart-slot" id="slot-bw-var">
+      <div class="card" id="bw-cc-var">
+        <div class="card-head">
+          <span class="drag-handle" title="Drag to reorder">⠿</span>
+          <div class="card-title">Volume by Variety</div>
+        </div>
+        <div class="card-body">
+          <div class="chart-std"><canvas id="bw-c-var"></canvas></div>
+        </div>
       </div>
     </div>
-    <div class="chart-card" id="bw-cc-owner">
-      <div class="chart-title-bar"><span class="chart-title">Volume by Owner</span></div>
-      <div class="chart-body">
-        <div class="chart-h-ava"><canvas id="bw-c-owner"></canvas></div>
+    <div class="chart-slot" id="slot-bw-owner">
+      <div class="card" id="bw-cc-owner">
+        <div class="card-head">
+          <span class="drag-handle" title="Drag to reorder">⠿</span>
+          <div class="card-title">Volume by Owner</div>
+        </div>
+        <div class="card-body">
+          <div class="chart-std"><canvas id="bw-c-owner"></canvas></div>
+        </div>
       </div>
     </div>
-    <div class="chart-card" id="bw-cc-subava">
-      <div class="chart-title-bar"><span class="chart-title">Volume by Sub AVA</span></div>
-      <div class="chart-body">
-        <div class="chart-h-ava"><canvas id="bw-c-subava"></canvas></div>
+    <div class="chart-slot" id="slot-bw-subava">
+      <div class="card" id="bw-cc-subava">
+        <div class="card-head">
+          <span class="drag-handle" title="Drag to reorder">⠿</span>
+          <div class="card-title">Volume by Sub AVA</div>
+        </div>
+        <div class="card-body">
+          <div class="chart-std"><canvas id="bw-c-subava"></canvas></div>
+        </div>
       </div>
     </div>
-    <div class="chart-card" id="bw-cc-vintage">
-      <div class="chart-title-bar"><span class="chart-title">Volume by Vintage</span></div>
-      <div class="chart-body">
-        <div class="chart-h-ava"><canvas id="bw-c-vintage"></canvas></div>
+    <div class="chart-slot" id="slot-bw-vintage">
+      <div class="card" id="bw-cc-vintage">
+        <div class="card-head">
+          <span class="drag-handle" title="Drag to reorder">⠿</span>
+          <div class="card-title">Volume by Vintage</div>
+        </div>
+        <div class="card-body">
+          <div class="chart-std"><canvas id="bw-c-vintage"></canvas></div>
+        </div>
       </div>
     </div>
-    <div class="chart-card" id="bw-cc-alloc">
-      <div class="chart-title-bar"><span class="chart-title">Brand Allocation</span></div>
-      <div class="chart-body">
-        <div class="chart-std"><canvas id="bw-c-alloc"></canvas></div>
+    <div class="chart-slot" id="slot-bw-alloc">
+      <div class="card" id="bw-cc-alloc">
+        <div class="card-head">
+          <span class="drag-handle" title="Drag to reorder">⠿</span>
+          <div class="card-title">Brand Allocation</div>
+        </div>
+        <div class="card-body">
+          <div class="chart-std"><canvas id="bw-c-alloc"></canvas></div>
+        </div>
       </div>
     </div>
-    <div class="chart-card" id="bw-cc-grade">
-      <div class="chart-title-bar"><span class="chart-title">Volume by Grading</span></div>
-      <div class="chart-body">
-        <div class="chart-h-ava"><canvas id="bw-c-grade"></canvas></div>
+    <div class="chart-slot" id="slot-bw-grade">
+      <div class="card" id="bw-cc-grade">
+        <div class="card-head">
+          <span class="drag-handle" title="Drag to reorder">⠿</span>
+          <div class="card-title">Volume by Grading</div>
+        </div>
+        <div class="card-body">
+          <div class="chart-std"><canvas id="bw-c-grade"></canvas></div>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- DATA TABLE -->
-  <div class="table-wrap" id="bw-table-wrap">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th onclick="sortBWTable('name')">Vessel</th>
-          <th onclick="sortBWTable('type')">Type</th>
-          <th onclick="sortBWTable('variety')">Variety</th>
-          <th onclick="sortBWTable('vintage')">Vintage</th>
-          <th onclick="sortBWTable('owner')">Owner</th>
-          <th onclick="sortBWTable('subava')">Sub AVA</th>
-          <th onclick="sortBWTable('volume')">Volume</th>
-          <th onclick="sortBWTable('grading')">Grading</th>
-          <th onclick="sortBWTable('taxstate')">Tax State</th>
-          <th onclick="sortBWTable('cost')">Cost/Gal</th>
-        </tr>
-      </thead>
-      <tbody id="bw-table-body">
-      </tbody>
-    </table>
+  <div class="row1">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Vessel Detail</div>
+        <div class="card-badge" id="bw-tbl-badge">— Records</div>
+      </div>
+      <div class="card-body" style="padding:0">
+        <div class="tbl-wrap">
+          <table>
+            <thead id="bw-tbl-head">
+              <tr>
+                <th data-col="name" onclick="sortBWTable('name')">Vessel</th>
+                <th data-col="type" onclick="sortBWTable('type')">Type</th>
+                <th data-col="variety" onclick="sortBWTable('variety')">Variety</th>
+                <th data-col="vintage" onclick="sortBWTable('vintage')">Vintage</th>
+                <th data-col="owner" onclick="sortBWTable('owner')">Owner</th>
+                <th data-col="subava" onclick="sortBWTable('subava')">Sub AVA</th>
+                <th data-col="volume" class="r" onclick="sortBWTable('volume')">Volume</th>
+                <th data-col="grading" onclick="sortBWTable('grading')">Grading</th>
+                <th data-col="taxstate" onclick="sortBWTable('taxstate')">Tax State</th>
+                <th data-col="cost" class="r" onclick="sortBWTable('cost')">Cost/Gal</th>
+              </tr>
+            </thead>
+            <tbody id="bw-table-body">
+            </tbody>
+            <tfoot id="bw-table-foot">
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 
 </main>
-  <footer class="footer">
+  <footer>
+    <span>Grapevine Capital · Bulk Wine Inventory · SharePoint Live</span>
     <span>Showing <span class="footer-count" id="bw-footer-count">—</span> records</span>
   </footer>
 </div><!-- /.bw-main-col -->
@@ -4373,10 +4471,26 @@ function renderBulkWineDoughnut(canvasId, dataObj) {
 
 function renderBulkWineTable(data) {
   const tbody = document.getElementById('bw-table-body');
+  const tfoot = document.getElementById('bw-table-foot');
   tbody.innerHTML = '';
+  tfoot.innerHTML = '';
+
+  if (data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;text-align:center;color:var(--dust);">No vessels match filters</td></tr>';
+    return;
+  }
+
+  let totalVolume = 0;
+  let totalCost = 0;
+
   data.forEach(vessel => {
     const row = document.createElement('tr');
     row.style.cssText = 'border-bottom:1px solid var(--border);';
+    const volume = vessel.volume?.value || 0;
+    const costPer = (vessel.cost?.total || 0) / (volume || 1);
+    totalVolume += volume;
+    totalCost += vessel.cost?.total || 0;
+
     row.innerHTML = `
       <td style="padding:10px 12px;color:var(--ink);">${vessel.name || '—'}</td>
       <td style="padding:10px 12px;color:var(--ink);">${vessel.vesselType || '—'}</td>
@@ -4384,16 +4498,25 @@ function renderBulkWineTable(data) {
       <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.vintage || '—'}</td>
       <td style="padding:10px 12px;color:var(--ink);">${vessel.owner?.name || '—'}</td>
       <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.designatedSubRegion?.name || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);text-align:right;">${(vessel.volume?.value || 0).toLocaleString(undefined, {maximumFractionDigits: 1})} ${vessel.volume?.unit || 'L'}</td>
+      <td style="padding:10px 12px;color:var(--ink);text-align:right;">${volume.toLocaleString(undefined, {maximumFractionDigits: 1})} ${vessel.volume?.unit || 'L'}</td>
       <td style="padding:10px 12px;color:var(--ink);">${vessel.wineBatch?.grading?.valueName || '—'}</td>
       <td style="padding:10px 12px;color:var(--ink);">${vessel.ttbDetails?.taxState || '—'}</td>
-      <td style="padding:10px 12px;color:var(--ink);text-align:right;">$${((vessel.cost?.total || 0) / (vessel.volume?.value || 1)).toFixed(2)}</td>
+      <td style="padding:10px 12px;color:var(--ink);text-align:right;">$${costPer.toFixed(2)}</td>
     `;
     tbody.appendChild(row);
   });
-  if (data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;text-align:center;color:var(--dust);">No vessels match filters</td></tr>';
-  }
+
+  // Add totals row
+  const footRow = document.createElement('tr');
+  footRow.style.cssText = 'background:var(--parchment);border-top:2px solid var(--border);font-weight:500;';
+  footRow.innerHTML = `
+    <td colspan="6" style="padding:10px 12px;color:var(--ink);text-align:right;"><strong>TOTALS</strong></td>
+    <td style="padding:10px 12px;color:var(--ink);text-align:right;"><strong>${totalVolume.toLocaleString(undefined, {maximumFractionDigits: 1})} L</strong></td>
+    <td style="padding:10px 12px;color:var(--ink);"></td>
+    <td style="padding:10px 12px;color:var(--ink);"></td>
+    <td style="padding:10px 12px;color:var(--ink);text-align:right;"><strong>$${(totalCost / (totalVolume || 1)).toFixed(2)}</strong></td>
+  `;
+  tfoot.appendChild(footRow);
 }
 
 function sortBWTable(column) { console.log('Sort by', column); }
@@ -4401,14 +4524,19 @@ function sortBWTable(column) { console.log('Sort by', column); }
 function toggleWidgetBW(key) {
   BULK_WINE_VISIBLE[key] = !BULK_WINE_VISIBLE[key];
   const btn = document.getElementById(`vis-bw-${key}`);
-  if (btn) btn.classList.toggle('active', BULK_WINE_VISIBLE[key]);
+  if (btn) btn.classList.toggle('hidden-chart', !BULK_WINE_VISIBLE[key]);
+  const kpiCard = document.querySelector(`[data-bw-kpi="${key}"]`);
+  if (kpiCard) kpiCard.style.display = BULK_WINE_VISIBLE[key] ? '' : 'none';
   renderBulkWineDashboard();
 }
 
 function toggleChartBW(key) {
   BULK_WINE_CHARTS_VISIBLE[key] = !BULK_WINE_CHARTS_VISIBLE[key];
-  const btn = document.getElementById(`vis-bw-${key.replace('-chart', '')}-chart`);
-  if (btn) btn.classList.toggle('active', BULK_WINE_CHARTS_VISIBLE[key]);
+  const chartKey = key.replace('-chart', '');
+  const btn = document.getElementById(`vis-bw-${chartKey}-chart`);
+  if (btn) btn.classList.toggle('hidden-chart', !BULK_WINE_CHARTS_VISIBLE[key]);
+  const slot = document.getElementById(`slot-bw-${chartKey}`);
+  if (slot) slot.style.display = BULK_WINE_CHARTS_VISIBLE[key] ? '' : 'none';
   renderBulkWineDashboard();
 }
 
@@ -4421,6 +4549,103 @@ function doResetBW() {
     if (cl) { cl.querySelectorAll('input[type="checkbox"]').forEach((cb, idx) => { cb.checked = idx === 0; }); }
   });
   renderBulkWineDashboard();
+}
+
+// ── BULK WINE COLLAPSIBLE SECTIONS ──────────────────────────
+const BW_TOP_SECTIONS = ['bw-widgets', 'bw-charts', 'bw-filters'];
+let openBWSubFilter = null;
+
+function toggleSectionBW(id) {
+  const body  = document.getElementById('section-' + id);
+  const arrow = document.getElementById('arrow-' + id);
+  if (!body) return;
+  const opening = !body.classList.contains('open');
+
+  if (opening) {
+    // Collapse every OTHER top section
+    BW_TOP_SECTIONS.forEach(other => {
+      if (other === id) return;
+      const ob = document.getElementById('section-' + other);
+      const oa = document.getElementById('arrow-' + other);
+      if (ob) ob.classList.remove('open');
+      if (oa) oa.classList.remove('open');
+      // If closing the filters section, also collapse any open sub-filter
+      if (other === 'bw-filters' && openBWSubFilter) {
+        const pb = document.getElementById('sf-body-bw-' + openBWSubFilter);
+        const pa = document.getElementById('sf-arrow-bw-' + openBWSubFilter);
+        if (pb) pb.classList.remove('open');
+        if (pa) pa.classList.remove('open');
+        openBWSubFilter = null;
+      }
+    });
+    body.classList.add('open');
+    if (arrow) arrow.classList.add('open');
+    // Mark filters-open if we just opened filters
+    if (id === 'bw-filters') {
+      document.getElementById('bw-sidebar')?.classList.add('filters-open');
+    }
+    setTimeout(resizeOpenSelects, 340);
+  } else {
+    // Closing this section
+    if (id === 'bw-filters' && openBWSubFilter) {
+      // Collapse open sub-filter when parent filters section closes
+      const pb = document.getElementById('sf-body-bw-' + openBWSubFilter);
+      const pa = document.getElementById('sf-arrow-bw-' + openBWSubFilter);
+      if (pb) pb.classList.remove('open');
+      if (pa) pa.classList.remove('open');
+      openBWSubFilter = null;
+    }
+    body.classList.remove('open');
+    if (arrow) arrow.classList.remove('open');
+    // Remove filters-open if we just closed filters
+    if (id === 'bw-filters') {
+      document.getElementById('bw-sidebar')?.classList.remove('filters-open');
+    }
+  }
+}
+
+function toggleSubFilterBW(name) {
+  const body  = document.getElementById('sf-body-bw-' + name);
+  const arrow = document.getElementById('sf-arrow-bw-' + name);
+  if (!body) return;
+
+  if (openBWSubFilter && openBWSubFilter !== name) {
+    // Collapse the previously open sub-filter
+    const pb = document.getElementById('sf-body-bw-' + openBWSubFilter);
+    const pa = document.getElementById('sf-arrow-bw-' + openBWSubFilter);
+    if (pb) pb.classList.remove('open');
+    if (pa) pa.classList.remove('open');
+    // Remove sticky from the previously open head
+    const prevHead = pb?.previousElementSibling;
+    if (prevHead) prevHead.classList.remove('sf-head-open');
+  }
+
+  const opening = !body.classList.contains('open');
+  body.classList.toggle('open', opening);
+  if (arrow) arrow.classList.toggle('open', opening);
+  openBWSubFilter = opening ? name : null;
+
+  // Apply/remove sticky on this head
+  const head = body.previousElementSibling;
+  if (head) head.classList.toggle('sf-head-open', opening);
+
+  if (opening) {
+    // Auto-size the select to fit options or available sidebar space
+    const select = body.querySelector('select[multiple]');
+    if (select) {
+      const optionCount = select.options.length;
+      const optionHeight = 20;
+      const idealHeight = optionCount * optionHeight + 6;
+      const sidebarRect = document.getElementById('bw-sidebar')?.getBoundingClientRect();
+      const bodyRect = body.getBoundingClientRect();
+      if (sidebarRect && bodyRect) {
+        const availableHeight = sidebarRect.height - (bodyRect.top - sidebarRect.top) - 100;
+        select.style.height = Math.min(idealHeight, availableHeight) + 'px';
+      } else {
+        select.style.height = Math.min(idealHeight, 200) + 'px';
+      }
+    }
+  }
 }
 
 function loadPrefs() {
